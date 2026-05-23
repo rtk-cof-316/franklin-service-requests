@@ -129,6 +129,13 @@ function App() {
           userRole={userRole}
         />
       )}
+      <div style={{ backgroundColor: '#0f3d7a', padding: '16px 24px', textAlign: 'center', fontSize: '13px', color: '#93afd4', marginTop: 'auto' }}>
+  Please email{' '}
+  <a href="mailto:bdemers@franklinnh.gov" style={{ color: '#ffffff', fontWeight: '600' }}>
+    bdemers@franklinnh.gov
+  </a>
+  {' '}if you have any issues with this site.
+</div>
     </div>
   )
 }
