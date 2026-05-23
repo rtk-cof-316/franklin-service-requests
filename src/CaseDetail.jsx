@@ -367,13 +367,22 @@ function CaseDetail({ caseId, onBack, userEmail }) {
     const newStatus = statuses.find(s => s.id === parseInt(selectedStatus))?.name
     const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
 
-    const { error } = await supabase
-      .from('cases')
-      .update({
-        status_id: selectedStatus || null,
-        followup_due_date: followupDate || null,
-      })
-      .eq('id', caseId)
+console.log('Updating case id:', caseId)
+console.log('followupDate value:', followupDate)
+console.log('selectedStatus value:', selectedStatus)
+
+const { data: updateData, error } = await supabase
+  .from('cases')
+  .update({
+    status_id: selectedStatus || null,
+    followup_due_date: followupDate || null,
+  })
+  .eq('id', caseId)
+  .select()
+
+console.log('Update response:', JSON.stringify(updateData), error)
+
+console.log('Save result:', error)
 
     if (!error) {
       if (newStatus && newStatus !== oldStatus) {
@@ -566,7 +575,8 @@ function CaseDetail({ caseId, onBack, userEmail }) {
                 ))}
               </select>
 
-              <div style={{ ...styles.fieldLabel, marginBottom: '6px', marginTop: '8px' }}>Follow-up Due Date</div>
+              <div style={{ ...styles.fieldLabel, marginBottom: '4px', marginTop: '8px' }}>Follow-up Due Date</div>
+<div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px' }}>Clear this date to remove from follow-up tracking</div>
               <input
                 type="date"
                 style={styles.input}

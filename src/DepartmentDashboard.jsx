@@ -12,6 +12,11 @@ const styles = {
     fontSize: '22px',
     fontWeight: '700',
     color: '#1a56a0',
+    margin: '0 0 4px 0',
+  },
+  pageSub: {
+    fontSize: '14px',
+    color: '#6b7280',
     margin: '0 0 24px 0',
   },
   cardsRow: {
@@ -75,6 +80,7 @@ const styles = {
     fontWeight: '700',
     color: '#1a56a0',
     marginRight: '12px',
+    cursor: 'pointer',
   },
   alertLocation: {
     color: '#374151',
@@ -187,16 +193,6 @@ const styles = {
     fontWeight: '600',
     marginLeft: '6px',
   },
-  deptTag: {
-    display: 'inline-block',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    borderRadius: '4px',
-    padding: '2px 6px',
-    fontSize: '11px',
-    marginRight: '4px',
-    marginBottom: '2px',
-  },
   viewBtn: {
     padding: '4px 12px',
     backgroundColor: '#1a56a0',
@@ -241,25 +237,44 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
-function AdminDashboard({ onViewCase, refreshKey }) {
+function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
   const [cases, setCases] = useState([])
+  const [departmentName, setDepartmentName] = useState('')
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
   const [search, setSearch] = useState('')
-  const [statuses, setStatuses] = useState([])
+
+  const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to pd']
 
   useEffect(() => {
+    loadDepartmentName()
     loadCases()
-    loadStatuses()
-  }, [refreshKey])
+  }, [departmentId, refreshKey])
 
-  async function loadStatuses() {
-    const { data } = await supabase.from('statuses').select('*').order('name')
-    setStatuses(data || [])
+  async function loadDepartmentName() {
+    const { data } = await supabase
+      .from('departments')
+      .select('name')
+      .eq('id', departmentId)
+      .single()
+    if (data) setDepartmentName(data.name)
   }
 
   async function loadCases() {
     setLoading(true)
+    const { data: caseDepts } = await supabase
+      .from('case_departments')
+      .select('case_id')
+      .eq('department_id', departmentId)
+
+    if (!caseDepts || caseDepts.length === 0) {
+      setCases([])
+      setLoading(false)
+      return
+    }
+
+    const caseIds = caseDepts.map(cd => cd.case_id)
+
     const { data, error } = await supabase
       .from('cases')
       .select(`
@@ -272,19 +287,14 @@ function AdminDashboard({ onViewCase, refreshKey }) {
         followup_due_date,
         closed_date,
         statuses ( name ),
-        issue_types ( name ),
-        case_departments (
-          departments ( name ),
-          statuses ( name )
-        )
+        issue_types ( name )
       `)
+      .in('id', caseIds)
       .order('date_submitted', { ascending: false })
 
     if (!error) setCases(data || [])
     setLoading(false)
   }
-
-  const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to pd']
 
   const filteredCases = cases.filter(c => {
     const statusName = (c.statuses?.name || '').toLowerCase()
@@ -315,7 +325,8 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.pageTitle}>Admin Dashboard</h1>
+      <h1 style={styles.pageTitle}>{departmentName} Dashboard</h1>
+      <p style={styles.pageSub}>Showing cases assigned to your department only</p>
 
       <div style={styles.cardsRow}>
         <div style={styles.scoreCard}>
@@ -353,7 +364,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
-          <div style={styles.tableTitle}>All Cases</div>
+          <div style={styles.tableTitle}>My Cases</div>
           <div style={styles.filterRow}>
             <input
               type="text"
@@ -387,7 +398,6 @@ function AdminDashboard({ onViewCase, refreshKey }) {
                 <th style={styles.th}>Location / Subject</th>
                 <th style={styles.th}>Issue Type</th>
                 <th style={styles.th}>Status</th>
-                <th style={styles.th}>Departments</th>
                 <th style={styles.th}></th>
               </tr>
             </thead>
@@ -409,14 +419,6 @@ function AdminDashboard({ onViewCase, refreshKey }) {
                     </span>
                   </td>
                   <td style={styles.td}>
-                    {c.case_departments?.length > 0
-                      ? c.case_departments.map((cd, i) => (
-                          <span key={i} style={styles.deptTag}>{cd.departments?.name}</span>
-                        ))
-                      : <span style={{ color: '#9ca3af', fontSize: '12px' }}>Unassigned</span>
-                    }
-                  </td>
-                  <td style={styles.td}>
                     <button style={styles.viewBtn} onClick={() => onViewCase && onViewCase(c.id)}>
                       View
                     </button>
@@ -431,4 +433,4 @@ function AdminDashboard({ onViewCase, refreshKey }) {
   )
 }
 
-export default AdminDashboard
+export default DepartmentDashboard
