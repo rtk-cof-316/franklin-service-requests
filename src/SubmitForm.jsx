@@ -26,6 +26,7 @@ const styles = {
     fontSize: '22px',
     fontWeight: '700',
     letterSpacing: '0.3px',
+    color: '#e8eef6',
   },
   headerSub: {
     margin: 0,
@@ -53,6 +54,13 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#374151',
+    marginBottom: '6px',
+  },
+  labelHint: {
+    display: 'block',
+    fontSize: '12px',
+    fontWeight: '400',
+    color: '#6b7280',
     marginBottom: '6px',
   },
   input: {
@@ -146,6 +154,22 @@ const styles = {
     borderRadius: '6px',
     cursor: 'not-allowed',
     letterSpacing: '0.3px',
+  },
+  disclaimer: {
+    marginTop: '20px',
+    padding: '14px 16px',
+    backgroundColor: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    fontSize: '12px',
+    color: '#6b7280',
+    lineHeight: '1.6',
+  },
+  disclaimerTitle: {
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: '4px',
+    fontSize: '12px',
   },
   successPage: {
     minHeight: '100vh',
@@ -358,6 +382,7 @@ function SubmitForm() {
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Full Name</label>
+            <span style={styles.labelHint}>Optional — you may submit anonymously</span>
             <input
               type="text"
               name="submitter_name"
@@ -370,6 +395,7 @@ function SubmitForm() {
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Email Address</label>
+            <span style={styles.labelHint}>Optional — required to receive a confirmation email</span>
             <input
               type="email"
               name="submitter_email"
@@ -382,6 +408,7 @@ function SubmitForm() {
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Phone Number</label>
+            <span style={styles.labelHint}>Optional</span>
             <input
               type="tel"
               name="submitter_phone"
@@ -430,6 +457,7 @@ function SubmitForm() {
             <label style={styles.label}>
               Description <span style={styles.required}>*</span>
             </label>
+            <span style={styles.labelHint}>This information will be visible on the public case tracker.</span>
             <textarea
               name="description"
               value={formData.description}
@@ -447,6 +475,11 @@ function SubmitForm() {
           >
             {loading ? 'Submitting...' : 'Submit Request'}
           </button>
+
+          <div style={styles.disclaimer}>
+            <div style={styles.disclaimerTitle}>Public Records Notice</div>
+            All service requests submitted to the City of Franklin are public records subject to disclosure under New Hampshire's Right-to-Know Law (RSA 91-A). Your contact information will be kept confidential and will not be shared publicly. You may submit this request anonymously by leaving the contact fields blank, however the details of your request, including location and description, will appear on the public case tracker.
+          </div>
 
         </div>
       </div>
