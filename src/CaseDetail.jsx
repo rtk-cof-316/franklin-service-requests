@@ -375,6 +375,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [selectedDept, setSelectedDept] = useState('')
   const [addingDept, setAddingDept] = useState(false)
 
+  const [rtkData, setRtkData] = useState(null)
   const [rtkFields, setRtkFields] = useState({
     acknowledged_date: '',
     request_topic: '',
@@ -446,14 +447,15 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       .eq('case_id', caseId)
       .single()
     if (data) {
+      setRtkData(data)
       setRtkFields({
         acknowledged_date: data.acknowledged_date ? data.acknowledged_date.slice(0, 10) : '',
         request_topic: data.request_topic || '',
-        number_of_records: data.number_of_records ?? '',
-        hours_worked: data.hours_worked ?? '',
-        hours_worked_closed: data.hours_worked_closed ?? '',
-        fees_assessed: data.fees_assessed ?? '',
-        fees_collected: data.fees_collected ?? '',
+        number_of_records: data.number_of_records != null ? data.number_of_records.toString() : '',
+        hours_worked: data.hours_worked != null ? data.hours_worked.toString() : '',
+        hours_worked_closed: data.hours_worked_closed != null ? data.hours_worked_closed.toString() : '',
+        fees_assessed: data.fees_assessed != null ? data.fees_assessed.toString() : '',
+        fees_collected: data.fees_collected != null ? data.fees_collected.toString() : '',
         date_records_ready: data.date_records_ready ? data.date_records_ready.slice(0, 10) : '',
         date_requestor_notified: data.date_requestor_notified ? data.date_requestor_notified.slice(0, 10) : '',
         appointment_datetime: data.appointment_datetime ? data.appointment_datetime.slice(0, 16) : '',
@@ -503,9 +505,8 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setAuditLog(data || [])
   }
 
-  // Filter statuses based on role and case type
-  const adminStatuses = allStatuses // admin sees all
-  const deptStatuses = allStatuses.filter(s => !s.is_91a_only) // dept never sees 91-A-only statuses
+  const adminStatuses = allStatuses
+  const deptStatuses = allStatuses.filter(s => !s.is_91a_only)
 
   async function handleSaveCase() {
     setSaving(true)
@@ -586,6 +587,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   async function handleSaveRtk() {
     setSavingRtk(true)
     setRtkSuccess(false)
+
     const { error } = await supabase
       .from('details_91a')
       .update({
@@ -608,7 +610,39 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       .select()
 
     if (!error) {
-      await logAudit(caseId, `91-A details updated`, userEmail)
+      // Build specific audit message
+      const changes = []
+      const oldAck = rtkData?.acknowledged_date?.slice(0, 10) || ''
+      const oldTopic = rtkData?.request_topic || ''
+      const oldRecords = rtkData?.number_of_records != null ? rtkData.number_of_records.toString() : ''
+      const oldHours = rtkData?.hours_worked != null ? rtkData.hours_worked.toString() : ''
+      const oldHoursClosed = rtkData?.hours_worked_closed != null ? rtkData.hours_worked_closed.toString() : ''
+      const oldFeeAssessed = rtkData?.fees_assessed != null ? rtkData.fees_assessed.toString() : ''
+      const oldFeeCollected = rtkData?.fees_collected != null ? rtkData.fees_collected.toString() : ''
+      const oldDelivery = rtkData?.delivery_method || ''
+      const oldTracking = rtkData?.tracking_number || ''
+      const oldRecordsReady = rtkData?.date_records_ready?.slice(0, 10) || ''
+      const oldNotified = rtkData?.date_requestor_notified?.slice(0, 10) || ''
+      const oldAppt = rtkData?.appointment_datetime?.slice(0, 16) || ''
+
+      if (rtkFields.acknowledged_date !== oldAck) changes.push('Acknowledged date updated')
+      if (rtkFields.request_topic !== oldTopic) changes.push(`Request topic set to "${rtkFields.request_topic}"`)
+      if (rtkFields.number_of_records !== oldRecords) changes.push('Number of records updated')
+      if (rtkFields.hours_worked !== oldHours) changes.push('Hours worked updated')
+      if (rtkFields.hours_worked_closed !== oldHoursClosed) changes.push('Hours worked (final) updated')
+      if (rtkFields.fees_assessed !== oldFeeAssessed) changes.push('Fees assessed updated')
+      if (rtkFields.fees_collected !== oldFeeCollected) changes.push('Fees collected updated')
+      if (rtkFields.date_records_ready !== oldRecordsReady) changes.push('Date records ready updated')
+      if (rtkFields.date_requestor_notified !== oldNotified) changes.push('Date requestor notified updated')
+      if (rtkFields.appointment_datetime !== oldAppt) changes.push('Appointment date/time updated')
+      if (rtkFields.delivery_method !== oldDelivery) changes.push(`Delivery method set to "${rtkFields.delivery_method}"`)
+      if (rtkFields.tracking_number !== oldTracking) changes.push('Tracking number updated')
+
+      const auditMessage = changes.length > 0
+        ? `91-A details updated: ${changes.join(', ')}`
+        : '91-A details saved (no changes)'
+
+      await logAudit(caseId, auditMessage, userEmail)
       setRtkSuccess(true)
       await loadRtkData()
       await loadAuditLog()
@@ -679,7 +713,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       <div style={styles.grid}>
         <div>
 
-          {/* Case Details */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Case Details</span>
@@ -721,7 +754,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           </div>
 
-          {/* 91-A Details — admin only */}
           {caseData.is_91a && isAdmin && (
             <div style={styles.card}>
               <div style={{ ...styles.cardHeader, ...styles.rtkHeader }}>
@@ -827,7 +859,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           )}
 
-          {/* Submitter Info — admin only */}
           {isAdmin && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
@@ -844,7 +875,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           )}
 
-          {/* Internal Notes */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Internal Notes</span>
@@ -868,7 +898,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           </div>
 
-          {/* Audit Log */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Activity Log</span>
@@ -894,10 +923,8 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
         </div>
 
-        {/* Right sidebar */}
         <div>
 
-          {/* Admin: full update panel */}
           {isAdmin && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
@@ -943,7 +970,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           )}
 
-          {/* Department: only their portion status */}
           {!isAdmin && myDeptAssignment && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
@@ -970,7 +996,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           )}
 
-          {/* Departments panel */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Assigned Departments</span>
