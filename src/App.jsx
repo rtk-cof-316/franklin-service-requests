@@ -6,6 +6,9 @@ import Login from './Login'
 import AdminDashboard from './AdminDashboard'
 import CaseDetail from './CaseDetail'
 import DepartmentDashboard from './DepartmentDashboard'
+import PrintWorkOrder from './PrintWorkOrder'
+import PrintCaseDetail from './PrintCaseDetail'
+import PrintMultipleWorkOrders from './PrintMultipleWorkOrders'
 
 function App() {
   const [page, setPage] = useState('submit')
@@ -15,6 +18,7 @@ function App() {
   const [viewingCaseId, setViewingCaseId] = useState(null)
   const [previousPage, setPreviousPage] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [bulkPrintIds, setBulkPrintIds] = useState([])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -24,10 +28,7 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session) loadUserProfile(session.user.id)
-      else {
-        setUserRole(null)
-        setUserDepartmentId(null)
-      }
+      else { setUserRole(null); setUserDepartmentId(null) }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -54,6 +55,11 @@ function App() {
     setViewingCaseId(null)
   }
 
+  function handleBulkPrint(ids) {
+  setBulkPrintIds(ids)
+  setPage('print-bulk-work-orders')
+  }
+
   function handleViewCase(caseId) {
     setPreviousPage(page)
     setViewingCaseId(caseId)
@@ -66,13 +72,23 @@ function App() {
     setRefreshKey(prev => prev + 1)
   }
 
+function handlePrintWorkOrder(caseId) {
+    setViewingCaseId(caseId)
+    setPage('print-work-order')
+  }
+
+  function handlePrintCaseDetail(caseId) {
+    setViewingCaseId(caseId)
+    setPage('print-case-detail')
+  }
+
   const navBtn = (target, label) => (
     <button
       onClick={() => setPage(target)}
       style={{
         background: 'none',
         border: 'none',
-        color: (page === target || (target === 'admin' && page === 'case-detail' && previousPage === 'admin') || (target === 'department' && page === 'case-detail' && previousPage === 'department')) ? '#ffffff' : '#93afd4',
+        color: (page === target || (target === 'admin' && ['case-detail','print-work-order','print-case-detail'].includes(page) && previousPage === 'admin') || (target === 'department' && ['case-detail','print-work-order'].includes(page) && previousPage === 'department')) ? '#ffffff' : '#93afd4',
         cursor: 'pointer',
         fontSize: '14px',
         fontWeight: '600',
@@ -82,31 +98,29 @@ function App() {
     </button>
   )
 
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders'].includes(page)
+
   return (
     <div>
-      <div style={{ backgroundColor: '#0f3d7a', padding: '10px 24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
-        {navBtn('submit', 'Submit a Request')}
-        {navBtn('track', 'Check Status')}
-        {session && userRole === 'admin' && navBtn('admin', 'Admin')}
-        {session && userRole === 'department' && navBtn('department', 'My Cases')}
-        <div style={{ marginLeft: 'auto' }}>
-          {session ? (
-            <button
-              onClick={handleLogout}
-              style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}
-            >
-              Log Out
-            </button>
-          ) : (
-            <button
-              onClick={() => setPage('login')}
-              style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}
-            >
-              Staff Login
-            </button>
-          )}
+      {showNav && (
+        <div style={{ backgroundColor: '#0f3d7a', padding: '10px 24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+          {navBtn('submit', 'Submit a Request')}
+          {navBtn('track', 'Check Status')}
+          {session && userRole === 'admin' && navBtn('admin', 'Admin')}
+          {session && userRole === 'department' && navBtn('department', 'My Cases')}
+          <div style={{ marginLeft: 'auto' }}>
+            {session ? (
+              <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
+                Log Out
+              </button>
+            ) : (
+              <button onClick={() => setPage('login')} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
+                Staff Login
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {page === 'submit' && <SubmitForm />}
       {page === 'track' && <CaseTracker />}
@@ -115,27 +129,43 @@ function App() {
         <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} />
       )}
       {page === 'department' && session && userRole === 'department' && (
-        <DepartmentDashboard
-          departmentId={userDepartmentId}
-          onViewCase={handleViewCase}
-          refreshKey={refreshKey}
-        />
-      )}
+  <DepartmentDashboard
+    departmentId={userDepartmentId}
+    onViewCase={handleViewCase}
+    refreshKey={refreshKey}
+    onBulkPrint={handleBulkPrint}
+  />
+)}
       {page === 'case-detail' && session && viewingCaseId && (
         <CaseDetail
           caseId={viewingCaseId}
           onBack={handleBack}
           userEmail={session.user.email}
           userRole={userRole}
+          userDepartmentId={userDepartmentId}
+          onPrintWorkOrder={handlePrintWorkOrder}
+          onPrintCaseDetail={handlePrintCaseDetail}
         />
       )}
-      <div style={{ backgroundColor: '#0f3d7a', padding: '16px 24px', textAlign: 'center', fontSize: '13px', color: '#93afd4', marginTop: 'auto' }}>
-  Please email{' '}
-  <a href="mailto:bdemers@franklinnh.gov" style={{ color: '#ffffff', fontWeight: '600' }}>
-    bdemers@franklinnh.gov
-  </a>
-  {' '}if you have any issues with this site.
-</div>
+      {page === 'print-work-order' && session && viewingCaseId && (
+        <PrintWorkOrder caseId={viewingCaseId} onClose={() => setPage('case-detail')} />
+      )}
+      {page === 'print-case-detail' && session && viewingCaseId && (
+        <PrintCaseDetail caseId={viewingCaseId} onClose={() => setPage('case-detail')} />
+      )}
+      {page === 'print-bulk-work-orders' && session && bulkPrintIds.length > 0 && (
+        <PrintMultipleWorkOrders caseIds={bulkPrintIds} onClose={() => setPage('department')} />
+    )}
+
+      {showNav && (
+        <div style={{ backgroundColor: '#0f3d7a', padding: '16px 24px', textAlign: 'center', fontSize: '13px', color: '#93afd4' }}>
+          Please email{' '}
+          <a href="mailto:bdemers@franklinnh.gov" style={{ color: '#ffffff', fontWeight: '600' }}>
+            bdemers@franklinnh.gov
+          </a>
+          {' '}if you have any issues with this site.
+        </div>
+      )}
     </div>
   )
 }

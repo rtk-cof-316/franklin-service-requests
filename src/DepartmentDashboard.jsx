@@ -117,6 +117,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   tableTitle: {
     fontSize: '15px',
@@ -127,6 +129,7 @@ const styles = {
     display: 'flex',
     gap: '10px',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   filterSelect: {
     padding: '6px 10px',
@@ -145,6 +148,35 @@ const styles = {
     color: '#374151',
     outline: 'none',
     width: '160px',
+  },
+  bulkBar: {
+    padding: '10px 24px',
+    backgroundColor: '#eff6ff',
+    borderBottom: '1px solid #bfdbfe',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '13px',
+    color: '#1e40af',
+  },
+  bulkPrintBtn: {
+    padding: '6px 14px',
+    backgroundColor: '#1a56a0',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  clearBtn: {
+    padding: '6px 10px',
+    backgroundColor: 'transparent',
+    color: '#6b7280',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '12px',
+    cursor: 'pointer',
   },
   table: {
     width: '100%',
@@ -237,19 +269,24 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
-function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
+const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to pd', 'lacks resources to resolve']
+
+function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint }) {
   const [cases, setCases] = useState([])
   const [departmentName, setDepartmentName] = useState('')
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
   const [search, setSearch] = useState('')
-
-  const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to pd']
+  const [selectedIds, setSelectedIds] = useState([])
 
   useEffect(() => {
     loadDepartmentName()
     loadCases()
   }, [departmentId, refreshKey])
+
+  useEffect(() => {
+    setSelectedIds([])
+  }, [statusFilter, search])
 
   async function loadDepartmentName() {
     const { data } = await supabase
@@ -262,9 +299,11 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
 
   async function loadCases() {
     setLoading(true)
+
+    // Get this dept's assignments including their dept-specific status
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('case_id')
+      .select('case_id, statuses ( name )')
       .eq('department_id', departmentId)
 
     if (!caseDepts || caseDepts.length === 0) {
@@ -274,6 +313,12 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
     }
 
     const caseIds = caseDepts.map(cd => cd.case_id)
+
+    // Build a lookup of case_id -> dept status
+    const deptStatusMap = {}
+    caseDepts.forEach(cd => {
+      deptStatusMap[cd.case_id] = cd.statuses?.name || null
+    })
 
     const { data, error } = await supabase
       .from('cases')
@@ -286,21 +331,29 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
         is_91a,
         followup_due_date,
         closed_date,
-        statuses ( name ),
         issue_types ( name )
       `)
       .in('id', caseIds)
       .order('date_submitted', { ascending: false })
 
-    if (!error) setCases(data || [])
+    if (!error) {
+      // Attach the dept-specific status to each case
+      const enriched = (data || []).map(c => ({
+        ...c,
+        dept_status: deptStatusMap[c.id] || null,
+      }))
+      setCases(enriched)
+    }
     setLoading(false)
   }
 
   const filteredCases = cases.filter(c => {
-    const statusName = (c.statuses?.name || '').toLowerCase()
-    const isOpen = !closedStatuses.includes(statusName)
+    const deptStatus = (c.dept_status || '').toLowerCase()
+    const isOpen = !closedStatuses.includes(deptStatus)
+
     if (statusFilter === 'open' && !isOpen) return false
     if (statusFilter === 'closed' && isOpen) return false
+
     if (search.trim()) {
       const s = search.toLowerCase()
       return (
@@ -313,15 +366,32 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
   })
 
   const openCases = cases.filter(c => {
-    const s = (c.statuses?.name || '').toLowerCase()
-    return !closedStatuses.includes(s)
+    const deptStatus = (c.dept_status || '').toLowerCase()
+    return !closedStatuses.includes(deptStatus)
   })
 
   const upcomingFollowups = cases.filter(c => {
     if (!c.followup_due_date) return false
     const days = daysUntil(c.followup_due_date)
-    return days !== null && days >= -999 && days <= 10
+    // Only show follow-ups for open cases
+    const deptStatus = (c.dept_status || '').toLowerCase()
+    const isOpen = !closedStatuses.includes(deptStatus)
+    return isOpen && days !== null && days >= -999 && days <= 10
   }).sort((a, b) => new Date(a.followup_due_date) - new Date(b.followup_due_date))
+
+  function toggleSelect(id) {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.length === filteredCases.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredCases.map(c => c.id))
+    }
+  }
 
   return (
     <div style={styles.page}>
@@ -332,7 +402,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
         <div style={styles.scoreCard}>
           <div style={styles.scoreCardLabel}>Open Cases</div>
           <div style={styles.scoreCardValue}>{openCases.length}</div>
-          <div style={styles.scoreCardSub}>Currently active</div>
+          <div style={styles.scoreCardSub}>Your department's active cases</div>
         </div>
 
         <div style={styles.scoreCard}>
@@ -385,6 +455,18 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
           </div>
         </div>
 
+        {selectedIds.length > 0 && (
+          <div style={styles.bulkBar}>
+            <span>{selectedIds.length} case{selectedIds.length !== 1 ? 's' : ''} selected</span>
+            <button style={styles.bulkPrintBtn} onClick={() => onBulkPrint && onBulkPrint(selectedIds)}>
+              Print Work Orders
+            </button>
+            <button style={styles.clearBtn} onClick={() => setSelectedIds([])}>
+              Clear
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div style={styles.loading}>Loading cases...</div>
         ) : filteredCases.length === 0 ? (
@@ -393,17 +475,33 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
           <table style={styles.table}>
             <thead>
               <tr>
+                <th style={{ ...styles.th, width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length === filteredCases.length && filteredCases.length > 0}
+                    onChange={toggleSelectAll}
+                    style={{ accentColor: '#1a56a0', cursor: 'pointer' }}
+                  />
+                </th>
                 <th style={styles.th}>Case #</th>
                 <th style={styles.th}>Date</th>
                 <th style={styles.th}>Location / Subject</th>
                 <th style={styles.th}>Issue Type</th>
-                <th style={styles.th}>Status</th>
+                <th style={styles.th}>My Status</th>
                 <th style={styles.th}></th>
               </tr>
             </thead>
             <tbody>
               {filteredCases.map(c => (
-                <tr key={c.id}>
+                <tr key={c.id} style={{ backgroundColor: selectedIds.includes(c.id) ? '#f0f7ff' : 'transparent' }}>
+                  <td style={styles.td}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(c.id)}
+                      onChange={() => toggleSelect(c.id)}
+                      style={{ accentColor: '#1a56a0', cursor: 'pointer' }}
+                    />
+                  </td>
                   <td style={styles.td}>
                     <span style={styles.caseNumLink} onClick={() => onViewCase && onViewCase(c.id)}>
                       {c.case_number}
@@ -414,8 +512,8 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey }) {
                   <td style={styles.td}>{c.location || '—'}</td>
                   <td style={styles.td}>{c.issue_types?.name || '—'}</td>
                   <td style={styles.td}>
-                    <span style={getStatusStyle(c.statuses?.name)}>
-                      {c.statuses?.name || '—'}
+                    <span style={getStatusStyle(c.dept_status)}>
+                      {c.dept_status || '—'}
                     </span>
                   </td>
                   <td style={styles.td}>
