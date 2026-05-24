@@ -9,11 +9,12 @@ import DepartmentDashboard from './DepartmentDashboard'
 import PrintWorkOrder from './PrintWorkOrder'
 import PrintCaseDetail from './PrintCaseDetail'
 import PrintMultipleWorkOrders from './PrintMultipleWorkOrders'
+import RoadWatch from './RoadWatch'
 
 function App() {
   const [page, setPage] = useState(() => {
-  const params = new URLSearchParams(window.location.search)
-  return params.get('page') || 'submit'
+    const params = new URLSearchParams(window.location.search)
+    return params.get('page') || 'submit'
   })
   const [session, setSession] = useState(null)
   const [userRole, setUserRole] = useState(null)
@@ -58,11 +59,6 @@ function App() {
     setViewingCaseId(null)
   }
 
-  function handleBulkPrint(ids) {
-  setBulkPrintIds(ids)
-  setPage('print-bulk-work-orders')
-  }
-
   function handleViewCase(caseId) {
     setPreviousPage(page)
     setViewingCaseId(caseId)
@@ -75,7 +71,7 @@ function App() {
     setRefreshKey(prev => prev + 1)
   }
 
-function handlePrintWorkOrder(caseId) {
+  function handlePrintWorkOrder(caseId) {
     setViewingCaseId(caseId)
     setPage('print-work-order')
   }
@@ -85,13 +81,23 @@ function handlePrintWorkOrder(caseId) {
     setPage('print-case-detail')
   }
 
+  function handleBulkPrint(ids) {
+    setBulkPrintIds(ids)
+    setPage('print-bulk-work-orders')
+  }
+
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders'].includes(page)
+
   const navBtn = (target, label) => (
     <button
       onClick={() => setPage(target)}
       style={{
         background: 'none',
         border: 'none',
-        color: (page === target || (target === 'admin' && ['case-detail','print-work-order','print-case-detail'].includes(page) && previousPage === 'admin') || (target === 'department' && ['case-detail','print-work-order'].includes(page) && previousPage === 'department')) ? '#ffffff' : '#93afd4',
+        color: (page === target ||
+          (target === 'admin' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin') ||
+          (target === 'department' && ['case-detail', 'print-work-order'].includes(page) && previousPage === 'department')
+        ) ? '#ffffff' : '#93afd4',
         cursor: 'pointer',
         fontSize: '14px',
         fontWeight: '600',
@@ -101,14 +107,13 @@ function handlePrintWorkOrder(caseId) {
     </button>
   )
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders'].includes(page)
-
   return (
     <div>
       {showNav && (
-        <div style={{ backgroundColor: '#0f3d7a', padding: '10px 24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <div style={{ backgroundColor: '#0f3d7a', padding: '10px 24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
           {navBtn('submit', 'Submit a Request')}
           {navBtn('track', 'Check Status')}
+          {navBtn('roads', 'Road Watch')}
           {session && userRole === 'admin' && navBtn('admin', 'Admin')}
           {session && userRole === 'department' && navBtn('department', 'My Cases')}
           <div style={{ marginLeft: 'auto' }}>
@@ -127,18 +132,19 @@ function handlePrintWorkOrder(caseId) {
 
       {page === 'submit' && <SubmitForm />}
       {page === 'track' && <CaseTracker />}
+      {page === 'roads' && <RoadWatch />}
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (
         <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} />
       )}
       {page === 'department' && session && userRole === 'department' && (
-  <DepartmentDashboard
-    departmentId={userDepartmentId}
-    onViewCase={handleViewCase}
-    refreshKey={refreshKey}
-    onBulkPrint={handleBulkPrint}
-  />
-)}
+        <DepartmentDashboard
+          departmentId={userDepartmentId}
+          onViewCase={handleViewCase}
+          refreshKey={refreshKey}
+          onBulkPrint={handleBulkPrint}
+        />
+      )}
       {page === 'case-detail' && session && viewingCaseId && (
         <CaseDetail
           caseId={viewingCaseId}
@@ -158,7 +164,7 @@ function handlePrintWorkOrder(caseId) {
       )}
       {page === 'print-bulk-work-orders' && session && bulkPrintIds.length > 0 && (
         <PrintMultipleWorkOrders caseIds={bulkPrintIds} onClose={() => setPage('department')} />
-    )}
+      )}
 
       {showNav && (
         <div style={{ backgroundColor: '#0f3d7a', padding: '16px 24px', textAlign: 'center', fontSize: '13px', color: '#93afd4' }}>
