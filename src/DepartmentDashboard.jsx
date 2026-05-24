@@ -269,7 +269,7 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to pd', 'lacks resources to resolve']
+const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve']
 
 function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint }) {
   const [cases, setCases] = useState([])
