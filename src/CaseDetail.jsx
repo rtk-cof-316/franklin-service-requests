@@ -314,18 +314,14 @@ const styles = {
     marginBottom: '12px',
     marginTop: '16px',
   },
-  readOnlyBadge: {
-    fontSize: '11px',
-    color: '#9ca3af',
-    fontStyle: 'italic',
-  },
 }
 
 function getStatusStyle(name) {
   const s = (name || '').toLowerCase()
   if (s === 'resolved' || s === 'closed') return { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46' }
-  if (s === 'in progress' || s === 'assigned' || s === 'scheduled') return { ...styles.statusBadge, backgroundColor: '#dbeafe', color: '#1e40af' }
-  if (s === 'lacks resources to resolve' || s === 'unfounded') return { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b' }
+  if (s === 'in progress' || s === 'assigned' || s === 'scheduled' || s === 'gathering records' || s === 'reviewing records') return { ...styles.statusBadge, backgroundColor: '#dbeafe', color: '#1e40af' }
+  if (s === 'lacks resources to resolve' || s === 'unfounded' || s === 'request abandoned') return { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b' }
+  if (s === 'clarification needed' || s === 'records ready - please schedule pick up') return { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e' }
   return { ...styles.statusBadge, backgroundColor: '#f3f4f6', color: '#374151' }
 }
 
@@ -353,14 +349,14 @@ const APPOINTMENT_METHODS = ['City USB', 'Self USB', 'In Person Viewing', 'Print
 
 function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onPrintWorkOrder, onPrintCaseDetail }) {
   const [caseData, setCaseData] = useState(null)
-  const [statuses, setStatuses] = useState([])
+  const [allStatuses, setAllStatuses] = useState([])
   const [issueTypes, setIssueTypes] = useState([])
   const [departments, setDepartments] = useState([])
+  const [requestTopics, setRequestTopics] = useState([])
   const [notes, setNotes] = useState([])
   const [auditLog, setAuditLog] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Admin fields
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedIssueType, setSelectedIssueType] = useState('')
   const [followupDate, setFollowupDate] = useState('')
@@ -368,7 +364,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  // Department portion status
   const [myDeptAssignment, setMyDeptAssignment] = useState(null)
   const [deptSelectedStatus, setDeptSelectedStatus] = useState('')
   const [savingDeptStatus, setSavingDeptStatus] = useState(false)
@@ -399,13 +394,15 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [savingRtk, setSavingRtk] = useState(false)
   const [rtkSuccess, setRtkSuccess] = useState(false)
 
+  const isAdmin = userRole === 'admin'
+
   useEffect(() => {
     loadAll()
   }, [caseId])
 
   async function loadAll() {
     setLoading(true)
-    await Promise.all([loadCase(), loadStatuses(), loadIssueTypes(), loadDepartments(), loadNotes(), loadAuditLog()])
+    await Promise.all([loadCase(), loadStatuses(), loadIssueTypes(), loadDepartments(), loadRequestTopics(), loadNotes(), loadAuditLog()])
     setLoading(false)
   }
 
@@ -432,8 +429,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       setFollowupDate(data.followup_due_date ? data.followup_due_date.slice(0, 10) : '')
       setIs91a(data.is_91a || false)
       if (data.is_91a) loadRtkData()
-
-      // Find this dept's assignment if dept user
       if (userRole === 'department' && userDepartmentId) {
         const myAssignment = data.case_departments?.find(cd => cd.department_id === userDepartmentId)
         if (myAssignment) {
@@ -472,7 +467,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
   async function loadStatuses() {
     const { data } = await supabase.from('statuses').select('*').order('name')
-    setStatuses(data || [])
+    setAllStatuses(data || [])
   }
 
   async function loadIssueTypes() {
@@ -483,6 +478,11 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   async function loadDepartments() {
     const { data } = await supabase.from('departments').select('*').order('name')
     setDepartments(data || [])
+  }
+
+  async function loadRequestTopics() {
+    const { data } = await supabase.from('request_topics').select('*').order('name')
+    setRequestTopics(data || [])
   }
 
   async function loadNotes() {
@@ -503,11 +503,15 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setAuditLog(data || [])
   }
 
+  // Filter statuses based on role and case type
+  const adminStatuses = allStatuses // admin sees all
+  const deptStatuses = allStatuses.filter(s => !s.is_91a_only) // dept never sees 91-A-only statuses
+
   async function handleSaveCase() {
     setSaving(true)
     setSaveSuccess(false)
     const oldStatus = caseData.statuses?.name
-    const newStatus = statuses.find(s => s.id === parseInt(selectedStatus))?.name
+    const newStatus = allStatuses.find(s => s.id === parseInt(selectedStatus))?.name
     const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
     const oldIssueType = caseData.issue_types?.name
     const newIssueType = issueTypes.find(t => t.id === parseInt(selectedIssueType))?.name
@@ -559,7 +563,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setSavingDeptStatus(true)
     setDeptSaveSuccess(false)
     const oldStatus = myDeptAssignment.statuses?.name
-    const newStatus = statuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
+    const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
 
     const { error } = await supabase
       .from('case_departments')
@@ -632,12 +636,12 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   async function handleAddDept() {
     if (!selectedDept) return
     setAddingDept(true)
-    const defaultStatus = statuses.find(s => s.name === 'Received')
+    const defaultStatus = allStatuses.find(s => s.name === 'Received')
     const deptName = departments.find(d => d.id === parseInt(selectedDept))?.name
     await supabase.from('case_departments').insert([{
       case_id: caseId,
       department_id: parseInt(selectedDept),
-      status_id: defaultStatus?.id || statuses[0]?.id,
+      status_id: defaultStatus?.id || allStatuses[0]?.id,
     }])
     await logAudit(caseId, `Assigned to ${deptName}`, userEmail)
     setSelectedDept('')
@@ -652,12 +656,10 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const assignedDeptNames = caseData.case_departments?.map(cd => cd.departments?.name) || []
   const availableDepts = departments.filter(d => !assignedDeptNames.includes(d.name))
   const showAppointment = APPOINTMENT_METHODS.includes(rtkFields.delivery_method)
-  const isAdmin = userRole === 'admin'
 
   return (
     <div style={styles.page}>
 
-      {/* Top bar */}
       <div style={styles.topBar}>
         <button style={styles.backBtn} onClick={onBack}>
           ← Back to Dashboard
@@ -677,7 +679,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       <div style={styles.grid}>
         <div>
 
-          {/* Case Details — read only for everyone */}
+          {/* Case Details */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Case Details</span>
@@ -738,8 +740,13 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                   </div>
                   <div>
                     <div style={styles.fieldLabel}>Request Topic</div>
-                    <input type="text" style={styles.input} placeholder="e.g. Financial Records" value={rtkFields.request_topic}
-                      onChange={e => setRtkFields(prev => ({ ...prev, request_topic: e.target.value }))} />
+                    <select style={styles.select} value={rtkFields.request_topic}
+                      onChange={e => setRtkFields(prev => ({ ...prev, request_topic: e.target.value }))}>
+                      <option value="">-- Select topic --</option>
+                      {requestTopics.map(t => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -902,7 +909,11 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Status</div>
                 <select style={styles.select} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
                   <option value="">-- Select status --</option>
-                  {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {adminStatuses.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}{s.is_91a_only ? ' (91-A)' : ''}
+                    </option>
+                  ))}
                 </select>
 
                 <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Issue Type</div>
@@ -946,7 +957,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Your Department's Status</div>
                 <select style={styles.select} value={deptSelectedStatus} onChange={e => setDeptSelectedStatus(e.target.value)}>
                   <option value="">-- Select status --</option>
-                  {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 <button
                   style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn}

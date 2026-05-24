@@ -11,7 +11,10 @@ import PrintCaseDetail from './PrintCaseDetail'
 import PrintMultipleWorkOrders from './PrintMultipleWorkOrders'
 
 function App() {
-  const [page, setPage] = useState('submit')
+  const [page, setPage] = useState(() => {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('page') || 'submit'
+  })
   const [session, setSession] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [userDepartmentId, setUserDepartmentId] = useState(null)

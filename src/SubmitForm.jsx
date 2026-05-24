@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 
+const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
 const styles = {
   page: {
     minHeight: '100vh',
@@ -244,7 +247,7 @@ function SubmitForm() {
     location: '',
     description: '',
     issue_type_id: '',
-    is_91a: false
+    is_91a: false,
   })
   const [submitted, setSubmitted] = useState(false)
   const [caseNumber, setCaseNumber] = useState('')
@@ -265,7 +268,7 @@ function SubmitForm() {
     const { name, value, type, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }))
   }
 
@@ -281,9 +284,10 @@ function SubmitForm() {
       .order('sequence_number', { ascending: false })
       .limit(1)
 
-    const nextSequence = existingCases && existingCases.length > 0
-      ? existingCases[0].sequence_number + 1
-      : 1
+    const nextSequence =
+      existingCases && existingCases.length > 0
+        ? existingCases[0].sequence_number + 1
+        : 1
 
     const newCaseNumber = `${nextSequence}-${currentYear}`
 
@@ -295,21 +299,23 @@ function SubmitForm() {
 
     const { data: newCase, error } = await supabase
       .from('cases')
-      .insert([{
-        case_number: newCaseNumber,
-        sequence_number: nextSequence,
-        year: parseInt(currentYear),
-        date_submitted: new Date().toISOString(),
-        location: formData.location,
-        description: formData.description,
-        issue_type_id: formData.issue_type_id || null,
-        is_91a: formData.is_91a,
-        submitter_name: formData.submitter_name,
-        submitter_email: formData.submitter_email,
-        submitter_phone: formData.submitter_phone,
-        status_id: statusData?.id || null,
-        created_at: new Date().toISOString()
-      }])
+      .insert([
+        {
+          case_number: newCaseNumber,
+          sequence_number: nextSequence,
+          year: parseInt(currentYear),
+          date_submitted: new Date().toISOString(),
+          location: formData.location,
+          description: formData.description,
+          issue_type_id: formData.issue_type_id || null,
+          is_91a: formData.is_91a,
+          submitter_name: formData.submitter_name,
+          submitter_email: formData.submitter_email,
+          submitter_phone: formData.submitter_phone,
+          status_id: statusData?.id || null,
+          created_at: new Date().toISOString(),
+        },
+      ])
       .select()
       .single()
 
@@ -320,9 +326,32 @@ function SubmitForm() {
     }
 
     if (formData.is_91a && newCase) {
-      await supabase
-        .from('details_91a')
-        .insert([{ case_id: newCase.id }])
+      await supabase.from('details_91a').insert([{ case_id: newCase.id }])
+    }
+
+    // Send confirmation email if email was provided
+    if (formData.submitter_email) {
+      try {
+        await fetch(
+          `${SUPABASE_URL}/functions/v1/send-confirmation-email`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              email: formData.submitter_email,
+              caseNumber: newCaseNumber,
+              location: formData.location,
+              description: formData.description,
+            }),
+          }
+        )
+      } catch (emailError) {
+        console.error('Email error:', emailError)
+        // Don't block submission if email fails
+      }
     }
 
     setCaseNumber(newCaseNumber)
@@ -339,13 +368,21 @@ function SubmitForm() {
             <h2 style={styles.successTitle}>Request Submitted</h2>
           </div>
           <div style={styles.successBody}>
-            <p style={styles.successText}>Thank you for contacting the City of Franklin. Your request has been received and will be reviewed shortly.</p>
+            <p style={styles.successText}>
+              Thank you for contacting the City of Franklin. Your request has
+              been received and will be reviewed shortly.
+            </p>
             <div style={styles.caseNumberBox}>
               <div style={styles.caseNumberLabel}>Your Case Number</div>
               <div style={styles.caseNumberValue}>{caseNumber}</div>
             </div>
-            <p style={styles.successText}>Please save your case number. You can use it to check the status of your request on our public dashboard.</p>
-            <p style={styles.successText}>A confirmation email will be sent if you provided an email address.</p>
+            <p style={styles.successText}>
+              Please save your case number. You can use it to check the status
+              of your request on our public dashboard.
+            </p>
+            <p style={styles.successText}>
+              A confirmation email will be sent if you provided an email address.
+            </p>
           </div>
         </div>
       </div>
@@ -360,7 +397,6 @@ function SubmitForm() {
           <p style={styles.headerSub}>City of Franklin, New Hampshire</p>
         </div>
         <div style={styles.body}>
-
           <div style={styles.checkboxRow}>
             <input
               type="checkbox"
@@ -371,10 +407,16 @@ function SubmitForm() {
             />
             <span style={styles.checkboxText}>
               This is a{' '}
-              <a href="https://www.nhmunicipal.org/right-know-law" target="_blank" rel="noopener noreferrer" style={styles.link}>
+              <a
+                href="https://www.nhmunicipal.org/right-know-law"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={styles.link}
+              >
                 Right-to-Know request (RSA 91-A)
               </a>
-              {' '}— check this box if you are requesting public records under New Hampshire law.
+              {' '}— check this box if you are requesting public records under
+              New Hampshire law.
             </span>
           </div>
 
@@ -395,7 +437,9 @@ function SubmitForm() {
 
           <div style={styles.fieldGroup}>
             <label style={styles.label}>Email Address</label>
-            <span style={styles.labelHint}>Optional — required to receive a confirmation email</span>
+            <span style={styles.labelHint}>
+              Optional — required to receive a confirmation email
+            </span>
             <input
               type="email"
               name="submitter_email"
@@ -434,7 +478,11 @@ function SubmitForm() {
               onChange={handleChange}
               required={!formData.is_91a}
               style={styles.input}
-              placeholder={formData.is_91a ? 'Brief subject of your records request' : 'Street address or nearest intersection'}
+              placeholder={
+                formData.is_91a
+                  ? 'Brief subject of your records request'
+                  : 'Street address or nearest intersection'
+              }
             />
           </div>
 
@@ -448,7 +496,9 @@ function SubmitForm() {
             >
               <option value="">-- Select an issue type --</option>
               {issueTypes.map(type => (
-                <option key={type.id} value={type.id}>{type.name}</option>
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
               ))}
             </select>
           </div>
@@ -457,14 +507,20 @@ function SubmitForm() {
             <label style={styles.label}>
               Description <span style={styles.required}>*</span>
             </label>
-            <span style={styles.labelHint}>This information will be visible on the public case tracker.</span>
+            <span style={styles.labelHint}>
+              This information will be visible on the public case tracker.
+            </span>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
               required
               style={styles.textarea}
-              placeholder={formData.is_91a ? 'Describe the records you are requesting, including any relevant dates or details.' : 'Please describe the issue in as much detail as possible.'}
+              placeholder={
+                formData.is_91a
+                  ? 'Describe the records you are requesting, including any relevant dates or details.'
+                  : 'Please describe the issue in as much detail as possible.'
+              }
             />
           </div>
 
@@ -478,9 +534,14 @@ function SubmitForm() {
 
           <div style={styles.disclaimer}>
             <div style={styles.disclaimerTitle}>Public Records Notice</div>
-            All service requests submitted to the City of Franklin are public records subject to disclosure under New Hampshire's Right-to-Know Law (RSA 91-A). Your contact information will be kept confidential and will not be shared publicly. You may submit this request anonymously by leaving the contact fields blank, however the details of your request, including location and description, will appear on the public case tracker.
+            All service requests submitted to the City of Franklin are public
+            records subject to disclosure under New Hampshire's Right-to-Know
+            Law (RSA 91-A). Your contact information will be kept confidential
+            and will not be shared publicly. You may submit this request
+            anonymously by leaving the contact fields blank, however the details
+            of your request, including location and description, will appear on
+            the public case tracker.
           </div>
-
         </div>
       </div>
     </div>

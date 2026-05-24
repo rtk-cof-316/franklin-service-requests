@@ -284,7 +284,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     setLoading(false)
   }
 
-  const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to pd']
+const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
 
   const filteredCases = cases.filter(c => {
     const statusName = (c.statuses?.name || '').toLowerCase()
