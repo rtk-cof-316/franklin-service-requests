@@ -37,7 +37,7 @@ function createColoredIcon(color) {
   })
 }
 
-const ROAD_ISSUE_TYPES = ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic']
+const ROAD_ISSUE_TYPES = ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding']
 const FRANKLIN_CENTER = [43.4445, -71.6487]
 const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
 
@@ -54,30 +54,10 @@ function formatDate(dateStr) {
 }
 
 const scoreCards = [
-  {
-    key: 'total',
-    label: 'Total Reported',
-    color: '#dc2626',
-    lightColor: '#fee2e2',
-  },
-  {
-    key: 'inProgress',
-    label: 'In Progress',
-    color: '#d97706',
-    lightColor: '#fef3c7',
-  },
-  {
-    key: 'avgDays',
-    label: 'Avg Days to Repair',
-    color: '#ca8a04',
-    lightColor: '#fefce8',
-  },
-  {
-    key: 'completed',
-    label: 'Completed',
-    color: '#16a34a',
-    lightColor: '#dcfce7',
-  },
+  { key: 'total', label: 'Total Reported', color: '#dc2626' },
+  { key: 'inProgress', label: 'In Progress', color: '#d97706' },
+  { key: 'avgDays', label: 'Avg Days to Repair', color: '#ca8a04' },
+  { key: 'completed', label: 'Completed', color: '#16a34a' },
 ]
 
 function RoadWatch() {
@@ -161,8 +141,8 @@ function RoadWatch() {
 
       {/* Hero */}
       <div style={{ backgroundColor: '#1a56a0', color: '#ffffff', padding: '32px 32px 28px 32px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#e8eef6', margin: '0 0 4px 0' }}>Franklin Road Watch</h1>
-        <p style={{ fontSize: '16px', color: '#bfdbfe', margin: '0 0 24px 0', lineHeight: '1.6' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#e8eef6', margin: '0 0 4px 0' }}>🛣️ Franklin Road Watch</h1>
+        <p style={{ fontSize: '18px', color: '#bfdbfe', margin: '0 0 24px 0', lineHeight: '1.6' }}>
           We're tracking every road issue — and working to fix them.<br />
           See every reported pothole, crack, and road defect in Franklin. Check if your issue is already logged, view its repair status, or submit a new one.
         </p>
@@ -170,24 +150,21 @@ function RoadWatch() {
         {/* Scorecards */}
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {scoreCards.map(card => (
-            <div
-              key={card.key}
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '8px',
-                border: `1px solid ${card.color}`,
-                borderTop: `5px solid ${card.color}`,
-                padding: '16px 24px',
-                textAlign: 'center',
-                minWidth: '130px',
-                flex: '1',
-                maxWidth: '180px',
-              }}
-            >
+            <div key={card.key} style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: `1px solid ${card.color}`,
+              borderTop: `5px solid ${card.color}`,
+              padding: '16px 24px',
+              textAlign: 'center',
+              minWidth: '130px',
+              flex: '1',
+              maxWidth: '180px',
+            }}>
               <div style={{ fontSize: '36px', fontWeight: '700', color: card.color, lineHeight: 1 }}>
                 {scoreValues[card.key]}
               </div>
-              <div style={{ fontSize: '16px', color: card.color, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '6px', fontWeight: '600' }}>
+              <div style={{ fontSize: '11px', color: card.color, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '6px', fontWeight: '600' }}>
                 {card.label}
               </div>
             </div>
@@ -281,7 +258,7 @@ function RoadWatch() {
           </div>
         )}
 
-        {/* Table */}
+        {/* Table with scrollable body */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: '20px' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb' }}>
             <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>📋 All Road Issues</span>
@@ -291,34 +268,71 @@ function RoadWatch() {
           ) : filteredCases.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280', fontSize: '14px', fontStyle: 'italic' }}>No road issues found.</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Case #', 'Date Reported', 'Location', 'Issue Type', 'Description', 'Status'].map(h => (
-                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6b7280', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCases.map(c => (
-                  <tr key={c.id}>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', color: '#1a56a0' }}>{c.case_number}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151' }}>{formatDate(c.date_submitted)}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151' }}>{c.location || '—'}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151' }}>{c.issue_types?.name || '—'}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', maxWidth: '220px' }}>{c.description}</td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6' }}>
-                      <span style={getStatusStyle(c.statuses?.name)}>{c.statuses?.name || '—'}</span>
-                    </td>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <thead>
+                  <tr style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                    {[
+                      { label: 'Case #', width: '80px' },
+                      { label: 'Date Reported', width: '120px' },
+                      { label: 'Location', width: '180px' },
+                      { label: 'Issue Type', width: '140px' },
+                      { label: 'Description', width: 'auto' },
+                      { label: 'Status', width: '120px' },
+                    ].map(h => (
+                      <th key={h.label} style={{
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        color: '#6b7280',
+                        backgroundColor: '#f9fafb',
+                        borderBottom: '2px solid #e5e7eb',
+                        whiteSpace: 'nowrap',
+                        width: h.width,
+                      }}>{h.label}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+              </table>
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '80px' }} />
+                    <col style={{ width: '120px' }} />
+                    <col style={{ width: '180px' }} />
+                    <col style={{ width: '140px' }} />
+                    <col />
+                    <col style={{ width: '120px' }} />
+                  </colgroup>
+                  <tbody>
+                    {filteredCases.map(c => (
+                      <tr key={c.id}>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', color: '#1a56a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.case_number}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', whiteSpace: 'nowrap' }}>{formatDate(c.date_submitted)}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.location || '—'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.issue_types?.name || '—'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: '1px solid #f3f4f6' }}>
+                          <span style={getStatusStyle(c.statuses?.name)}>{c.statuses?.name || '—'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
-          <RoadVote />
         </div>
 
+        <RoadVote />
+
+        <div style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', paddingBottom: '24px' }}>
+          Data maintained by City of Franklin Municipal Services Department. Updated in real time.
         </div>
+      </div>
     </div>
   )
 }

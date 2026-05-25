@@ -244,7 +244,7 @@ function daysUntil(dateStr) {
 function AdminDashboard({ onViewCase, refreshKey }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('open')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState([])
 

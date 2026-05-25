@@ -96,7 +96,7 @@ function RoadVote() {
         <div style={{ fontSize: '26px', fontWeight: '700', color: '#e8eef6', marginBottom: '2px' }}>
           Which Road Needs the Most Work?
         </div>
-        <div style={{ fontSize: '16px', color: '#93afd4' }}>
+        <div style={{ fontSize: '18px', color: '#93afd4' }}>
           Cast your vote — tell us which Franklin road needs attention most.
         </div>
       </div>
