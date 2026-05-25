@@ -10,6 +10,7 @@ import PrintWorkOrder from './PrintWorkOrder'
 import PrintCaseDetail from './PrintCaseDetail'
 import PrintMultipleWorkOrders from './PrintMultipleWorkOrders'
 import RoadWatch from './RoadWatch'
+import PublicAnalytics from './PublicAnalytics'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -114,6 +115,7 @@ function App() {
           {navBtn('submit', 'Submit a Request')}
           {navBtn('track', 'Check Status')}
           {navBtn('roads', 'Road Watch')}
+          {navBtn('analytics', 'City Analytics')}
           {session && userRole === 'admin' && navBtn('admin', 'Admin')}
           {session && userRole === 'department' && navBtn('department', 'My Cases')}
           <div style={{ marginLeft: 'auto' }}>
@@ -133,6 +135,7 @@ function App() {
       {page === 'submit' && <SubmitForm />}
       {page === 'track' && <CaseTracker />}
       {page === 'roads' && <RoadWatch />}
+      {page === 'analytics' && <PublicAnalytics />}
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (
         <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} />

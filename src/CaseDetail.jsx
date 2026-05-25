@@ -391,6 +391,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     mailed: false,
     tracking_number: '',
     hold_for_pickup: false,
+    public_records_url: '',
   })
   const [savingRtk, setSavingRtk] = useState(false)
   const [rtkSuccess, setRtkSuccess] = useState(false)
@@ -463,6 +464,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         mailed: data.mailed || false,
         tracking_number: data.tracking_number || '',
         hold_for_pickup: data.hold_for_pickup || false,
+        public_records_url: data.public_records_url || '',
       })
     }
   }
@@ -605,12 +607,12 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         mailed: rtkFields.mailed,
         tracking_number: rtkFields.tracking_number || null,
         hold_for_pickup: rtkFields.hold_for_pickup,
+        public_records_url: rtkFields.public_records_url || null,
       })
       .eq('case_id', caseId)
       .select()
 
     if (!error) {
-      // Build specific audit message
       const changes = []
       const oldAck = rtkData?.acknowledged_date?.slice(0, 10) || ''
       const oldTopic = rtkData?.request_topic || ''
@@ -624,6 +626,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       const oldRecordsReady = rtkData?.date_records_ready?.slice(0, 10) || ''
       const oldNotified = rtkData?.date_requestor_notified?.slice(0, 10) || ''
       const oldAppt = rtkData?.appointment_datetime?.slice(0, 16) || ''
+      const oldUrl = rtkData?.public_records_url || ''
 
       if (rtkFields.acknowledged_date !== oldAck) changes.push('Acknowledged date updated')
       if (rtkFields.request_topic !== oldTopic) changes.push(`Request topic set to "${rtkFields.request_topic}"`)
@@ -637,6 +640,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       if (rtkFields.appointment_datetime !== oldAppt) changes.push('Appointment date/time updated')
       if (rtkFields.delivery_method !== oldDelivery) changes.push(`Delivery method set to "${rtkFields.delivery_method}"`)
       if (rtkFields.tracking_number !== oldTracking) changes.push('Tracking number updated')
+      if (rtkFields.public_records_url !== oldUrl) changes.push('Public records URL updated')
 
       const auditMessage = changes.length > 0
         ? `91-A details updated: ${changes.join(', ')}`
@@ -851,6 +855,17 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                       onChange={e => setRtkFields(prev => ({ ...prev, tracking_number: e.target.value }))} />
                   </>
                 )}
+
+                <div style={styles.sectionDivider}>Public Records</div>
+                <div style={styles.fieldLabel}>Public Records URL</div>
+                <div style={styles.inputHint}>Paste a link here once records have been picked up and are ready for public viewing. This will appear in the public analytics dashboard.</div>
+                <input
+                  type="text"
+                  style={styles.input}
+                  placeholder="https://drive.google.com/..."
+                  value={rtkFields.public_records_url}
+                  onChange={e => setRtkFields(prev => ({ ...prev, public_records_url: e.target.value }))}
+                />
 
                 <button style={savingRtk ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveRtk} disabled={savingRtk}>
                   {savingRtk ? 'Saving...' : 'Save 91-A Details'}
