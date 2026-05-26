@@ -267,7 +267,7 @@ function PublicAnalytics() {
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '24px' }}>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>📊 Case Outcomes — What Happened to Every Request</div>
           <div style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.6', marginBottom: '16px' }}>
-            This chart shows the outcome of every service request submitted to the City. Most cases are resolved. We believe in being transparent about cases where resolution wasn't possible — and starting that conversation with our community.
+            This chart shows the outcome of every service request submitted to the City.
           </div>
           <div style={{ display: 'flex', height: '34px', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
             {outcomeSegments.map(s => (
@@ -285,7 +285,7 @@ function PublicAnalytics() {
             ))}
           </div>
           <div style={{ marginTop: '14px', padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '14px', color: '#4b5563', lineHeight: '1.6' }}>
-            "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified. These outcomes are reported transparently as part of our commitment to open government.
+            "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified.
           </div>
         </div>
 
@@ -305,7 +305,7 @@ function PublicAnalytics() {
 
         <SectionCard
           title="📅 Monthly Case Volume"
-          description="Tracking how many requests come in each month helps us understand seasonal trends and measure our responsiveness over time. Consistent volume shows an engaged community — and a City that's listening."
+          description="Tracking how many requests come in each month helps us understand seasonal trends and measure our responsiveness over time."
         >
           <BarChart data={monthlyData} labelKey="label" valueKey="count" />
         </SectionCard>
@@ -332,7 +332,7 @@ function PublicAnalytics() {
 
         <SectionCard
           title="🔁 Top Repeat Requestors"
-          description="Some individuals file multiple Right-to-Know requests over time. Requestors are identified by assigned ID numbers only — no names are displayed publicly. This chart reflects the volume of requests from our most active filers."
+          description="Some individuals file multiple Right-to-Know requests over time. Requestors are identified by assigned ID numbers only, no names are displayed publicly. This chart reflects the volume of requests from our most active filers."
         >
           <BarChart data={repeatRequestors} labelKey="label" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
@@ -448,7 +448,7 @@ function PublicAnalytics() {
         </div>
 
         <div style={{ textAlign: 'center', fontSize: '13px', color: '#6b7280', paddingBottom: '24px' }}>
-          Data updated in real time. City of Franklin, New Hampshire — Office of the City Manager.
+          Data updated in real time.
         </div>
       </div>
     </div>
