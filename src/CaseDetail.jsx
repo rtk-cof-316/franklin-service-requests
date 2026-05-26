@@ -392,6 +392,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     tracking_number: '',
     hold_for_pickup: false,
     public_records_url: '',
+    tax_dollar_spent: '',
   })
   const [savingRtk, setSavingRtk] = useState(false)
   const [rtkSuccess, setRtkSuccess] = useState(false)
@@ -465,6 +466,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         tracking_number: data.tracking_number || '',
         hold_for_pickup: data.hold_for_pickup || false,
         public_records_url: data.public_records_url || '',
+        tax_dollar_spent: data.tax_dollar_spent != null ? data.tax_dollar_spent.toString() : '',
       })
     }
   }
@@ -608,6 +610,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         tracking_number: rtkFields.tracking_number || null,
         hold_for_pickup: rtkFields.hold_for_pickup,
         public_records_url: rtkFields.public_records_url || null,
+        tax_dollar_spent: rtkFields.tax_dollar_spent !== '' ? parseFloat(rtkFields.tax_dollar_spent) : null,
       })
       .eq('case_id', caseId)
       .select()
@@ -806,18 +809,24 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 </div>
 
                 <div style={styles.sectionDivider}>Fees</div>
-                <div style={styles.twoCol}>
-                  <div>
-                    <div style={styles.fieldLabel}>Fees Assessed ($)</div>
-                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_assessed}
-                      onChange={e => setRtkFields(prev => ({ ...prev, fees_assessed: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div style={styles.fieldLabel}>Fees Collected ($)</div>
-                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_collected}
-                      onChange={e => setRtkFields(prev => ({ ...prev, fees_collected: e.target.value }))} />
-                  </div>
-                </div>
+<div style={styles.twoCol}>
+  <div>
+    <div style={styles.fieldLabel}>Fees Assessed ($)</div>
+    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_assessed}
+      onChange={e => setRtkFields(prev => ({ ...prev, fees_assessed: e.target.value }))} />
+  </div>
+  <div>
+    <div style={styles.fieldLabel}>Fees Collected ($)</div>
+    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_collected}
+      onChange={e => setRtkFields(prev => ({ ...prev, fees_collected: e.target.value }))} />
+  </div>
+</div>
+<div style={{ maxWidth: '50%', paddingRight: '5px' }}>
+  <div style={styles.fieldLabel}>Tax Dollars Spent ($)</div>
+  <div style={styles.inputHint}>Total cost to the city for fulfilling this request</div>
+  <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.tax_dollar_spent || ''}
+    onChange={e => setRtkFields(prev => ({ ...prev, tax_dollar_spent: e.target.value }))} />
+</div>
 
                 <div style={styles.sectionDivider}>Fulfillment</div>
                 <div style={styles.twoCol}>
