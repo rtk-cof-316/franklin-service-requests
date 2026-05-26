@@ -16,6 +16,11 @@ function formatHours(n) {
   return `${parseFloat(n).toFixed(1)}h`
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 function isWithin5BusinessDays(submitted, acknowledged) {
   if (!submitted || !acknowledged) return false
   let count = 0
@@ -75,6 +80,15 @@ function SectionCard({ title, children }) {
   )
 }
 
+function getStatusStyle(name) {
+  const s = (name || '').toLowerCase()
+  if (s === 'resolved' || s === 'closed') return { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#d1fae5', color: '#065f46', display: 'inline-block', whiteSpace: 'nowrap' }
+  if (['in progress','assigned','scheduled','gathering records','reviewing records'].includes(s)) return { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af', display: 'inline-block', whiteSpace: 'nowrap' }
+  if (['clarification needed','records ready - please schedule pick up'].includes(s)) return { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#fef3c7', color: '#92400e', display: 'inline-block', whiteSpace: 'nowrap' }
+  if (['lacks resources to resolve','unfounded','request abandoned'].includes(s)) return { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#fee2e2', color: '#991b1b', display: 'inline-block', whiteSpace: 'nowrap' }
+  return { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#374151', display: 'inline-block', whiteSpace: 'nowrap' }
+}
+
 const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
 
 function PublicAnalytics() {
@@ -82,6 +96,8 @@ function PublicAnalytics() {
   const [deptCases, setDeptCases] = useState([])
   const [rtkDetails, setRtkDetails] = useState([])
   const [loading, setLoading] = useState(true)
+  const [rtkSearch, setRtkSearch] = useState('')
+  const [rtkStatusFilter, setRtkStatusFilter] = useState('all')
 
   useEffect(() => {
     loadAll()
@@ -96,7 +112,7 @@ function PublicAnalytics() {
   async function loadCases() {
     const { data } = await supabase
       .from('cases')
-      .select('id, date_submitted, closed_date, is_91a, submitter_name, statuses ( name ), issue_types ( name )')
+      .select('id, case_number, date_submitted, closed_date, is_91a, submitter_name, requestor_id, location, description, statuses ( name ), issue_types ( name )')
     setCases(data || [])
   }
 
@@ -120,7 +136,6 @@ function PublicAnalytics() {
     </div>
   )
 
-  // General metrics
   const totalCases = cases.length
   const resolvedCases = cases.filter(c => closedStatuses.includes((c.statuses?.name || '').toLowerCase()))
   const openCases = cases.filter(c => !closedStatuses.includes((c.statuses?.name || '').toLowerCase()))
@@ -135,7 +150,6 @@ function PublicAnalytics() {
     return `${Math.round(avg)} days`
   })()
 
-  // Cases by department
   const deptCounts = {}
   deptCases.forEach(dc => {
     const name = dc.departments?.name
@@ -143,15 +157,13 @@ function PublicAnalytics() {
   })
   const deptData = Object.entries(deptCounts).map(([dept, count]) => ({ dept, count })).sort((a, b) => b.count - a.count)
 
-  // Cases by issue type
   const typeCounts = {}
   cases.forEach(c => {
     const name = c.issue_types?.name
-    if (name && name !== 'null') typeCounts[name] = (typeCounts[name] || 0) + 1
+    if (name) typeCounts[name] = (typeCounts[name] || 0) + 1
   })
   const typeData = Object.entries(typeCounts).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count)
 
-  // Monthly volume
   const monthlyCounts = {}
   cases.forEach(c => {
     if (!c.date_submitted) return
@@ -167,15 +179,12 @@ function PublicAnalytics() {
       return { label, count }
     })
 
-  // 91-A metrics — all from rtkDetails directly
   const rtkCases = cases.filter(c => c.is_91a)
   const total91a = rtkCases.length
-
   const totalDocsReleased = rtkDetails.reduce((sum, d) => sum + (parseInt(d.number_of_records) || 0), 0)
   const totalHours = rtkDetails.reduce((sum, d) => sum + (parseFloat(d.hours_worked) || 0), 0)
   const totalFees = rtkDetails.reduce((sum, d) => sum + (parseFloat(d.fees_collected) || 0), 0)
 
-  // Acknowledged on time — need case date_submitted, match by case_id
   const caseMap = {}
   cases.forEach(c => { caseMap[c.id] = c })
 
@@ -188,30 +197,40 @@ function PublicAnalytics() {
   }).length
   const onTimeRate = acknowledgedTotal > 0 ? `${Math.round((acknowledgedOnTime / acknowledgedTotal) * 100)}%` : '—'
 
-  // Topic breakdown
   const topicCounts = {}
   rtkDetails.forEach(d => {
     if (d.request_topic) topicCounts[d.request_topic] = (topicCounts[d.request_topic] || 0) + 1
   })
   const topicData = Object.entries(topicCounts).map(([topic, count]) => ({ topic, count })).sort((a, b) => b.count - a.count)
 
-  // Repeat requestors — anonymized, use submitter_name from rtk cases
   const requestorCounts = {}
   rtkCases.forEach(c => {
-    const name = c.submitter_name || 'Anonymous'
-    requestorCounts[name] = (requestorCounts[name] || 0) + 1
+    const rid = c.requestor_id || 'Unknown'
+    requestorCounts[rid] = (requestorCounts[rid] || 0) + 1
   })
   const repeatRequestors = Object.entries(requestorCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
-    .map(([_, count], i) => ({ label: `R${String(i + 1).padStart(3, '0')}`, count }))
+    .map(([rid, count]) => ({ label: rid, count }))
 
-  // Released records with public URLs
-  const releasedRecords = rtkDetails.filter(d => {
-    if (!d.public_records_url) return false
-    const c = caseMap[d.case_id]
-    return c && closedStatuses.includes((c.statuses?.name || '').toLowerCase())
-  })
+  // 91-A public log table
+  const rtkTableCases = rtkCases.map(c => {
+    const detail = rtkDetails.find(d => d.case_id === c.id)
+    return { ...c, detail }
+  }).filter(c => {
+    if (rtkStatusFilter === 'open' && closedStatuses.includes((c.statuses?.name || '').toLowerCase())) return false
+    if (rtkStatusFilter === 'closed' && !closedStatuses.includes((c.statuses?.name || '').toLowerCase())) return false
+    if (rtkSearch.trim()) {
+      const s = rtkSearch.toLowerCase()
+      return (
+        c.case_number?.toLowerCase().includes(s) ||
+        (c.requestor_id || '').toLowerCase().includes(s) ||
+        (c.detail?.request_topic || '').toLowerCase().includes(s) ||
+        (c.description || '').toLowerCase().includes(s)
+      )
+    }
+    return true
+  }).sort((a, b) => new Date(b.date_submitted) - new Date(a.date_submitted))
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8', fontFamily: "'Segoe UI', Arial, sans-serif" }}>
@@ -250,7 +269,7 @@ function PublicAnalytics() {
 
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
           <ScoreCard value={formatNum(total91a)} label="Total 91-A Requests" color="#1a56a0" />
-          <ScoreCard value={formatNum(totalDocsReleased)} label="Documents Requested" color="#16a34a" />
+          <ScoreCard value={formatNum(totalDocsReleased)} label="Documents Released" color="#16a34a" />
           <ScoreCard value={onTimeRate} label="Acknowledged On Time" sub="Within 5 business days" color="#d97706" />
           <ScoreCard value={formatHours(totalHours)} label="Total Staff Hours" color="#7c3aed" />
           <ScoreCard value={formatMoney(totalFees)} label="Fees Collected" color="#0891b2" />
@@ -262,51 +281,101 @@ function PublicAnalytics() {
 
         <SectionCard title="🔁 Top Repeat Requestors">
           <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px', lineHeight: '1.5' }}>
-            Requestor identities are anonymized to protect privacy. This chart shows the volume of requests from our most frequent filers.
+            Requestors are identified by their assigned Requestor ID. Names are not displayed publicly.
           </p>
           <BarChart data={repeatRequestors} labelKey="label" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
 
-        <SectionCard title="📂 Public Records Library (In-Progress, TBD)">
-          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px', lineHeight: '1.5' }}>
-            The following records have been released and are available for public viewing. Records are posted after fulfillment of a Right-to-Know request under RSA 91-A.
-          </p>
-          {releasedRecords.length === 0 ? (
-            <div style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic' }}>No public records have been posted yet.</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        {/* 91-A Public Log */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: '24px' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>📜 Public Right-to-Know Request Log</span>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Search by case #, RID, topic..."
+                value={rtkSearch}
+                onChange={e => setRtkSearch(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', width: '220px' }}
+              />
+              <select
+                value={rtkStatusFilter}
+                onChange={e => setRtkStatusFilter(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', backgroundColor: '#ffffff' }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="open">Open Only</option>
+                <option value="closed">Closed Only</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr>
-                  {['Case #', 'Date Released', 'Topic', 'Records'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#6b7280', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                  {[
+                    { label: 'Case #', width: '80px' },
+                    { label: 'Date', width: '100px' },
+                    { label: 'Requestor ID', width: '110px' },
+                    { label: 'Topic', width: '160px' },
+                    { label: 'Request', width: 'auto' },
+                    { label: 'Status', width: '140px' },
+                    { label: 'Hours', width: '70px' },
+                    { label: 'Fees', width: '80px' },
+                  ].map(h => (
+                    <th key={h.label} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#6b7280', backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb', whiteSpace: 'nowrap', width: h.width }}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {releasedRecords.map((d, i) => {
-                  const c = caseMap[d.case_id]
-                  return (
-                    <tr key={i}>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6' }}>
-                        <a href={d.public_records_url} target="_blank" rel="noopener noreferrer" style={{ color: '#1a56a0', fontWeight: '700', textDecoration: 'none' }}>
-                          View {c?.case_number} ↗
-                        </a>
-                      </td>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: '#374151', borderBottom: '1px solid #f3f4f6' }}>
-                        {c?.closed_date ? new Date(c.closed_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                      </td>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: '#374151', borderBottom: '1px solid #f3f4f6' }}>{d.request_topic || '—'}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: '#374151', borderBottom: '1px solid #f3f4f6' }}>{d.number_of_records || '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
             </table>
-          )}
-        </SectionCard>
+            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '100px' }} />
+                  <col style={{ width: '110px' }} />
+                  <col style={{ width: '160px' }} />
+                  <col />
+                  <col style={{ width: '140px' }} />
+                  <col style={{ width: '70px' }} />
+                  <col style={{ width: '80px' }} />
+                </colgroup>
+                <tbody>
+                  {rtkTableCases.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: '13px' }}>No records found.</td>
+                    </tr>
+                  ) : rtkTableCases.map(c => (
+                    <tr key={c.id}>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', color: '#1a56a0' }}>{c.case_number}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDate(c.date_submitted)}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', fontWeight: '600' }}>{c.requestor_id || '—'}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.detail?.request_topic || '—'}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151' }}>
+                        <div style={{ maxHeight: '60px', overflowY: 'auto', lineHeight: '1.4' }}>{c.description || '—'}</div>
+                      </td>
+                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6' }}>
+                        <span style={getStatusStyle(c.statuses?.name)}>{c.statuses?.name || '—'}</span>
+                      </td>
+                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151', textAlign: 'right' }}>
+                        {c.detail?.hours_worked ? parseFloat(c.detail.hours_worked).toFixed(1) : '—'}
+                      </td>
+                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151', textAlign: 'right' }}>
+                        {c.detail?.fees_collected ? `$${parseFloat(c.detail.fees_collected).toFixed(2)}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style={{ padding: '8px 20px', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb', fontSize: '11px', color: '#9ca3af' }}>
+            Showing {rtkTableCases.length} of {rtkCases.length} requests. Requestor names are not displayed publicly — Requestor IDs are assigned for tracking purposes only.
+          </div>
+        </div>
 
         <div style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', paddingBottom: '24px' }}>
-          Data updated in real time.
+          Data updated in real time. City of Franklin, New Hampshire — Office of the City Manager.
         </div>
       </div>
     </div>

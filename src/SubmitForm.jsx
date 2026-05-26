@@ -326,8 +326,35 @@ function SubmitForm() {
     }
 
     if (formData.is_91a && newCase) {
-      await supabase.from('details_91a').insert([{ case_id: newCase.id }])
+  await supabase.from('details_91a').insert([{ case_id: newCase.id }])
+
+  // Auto-assign requestor ID
+  if (formData.submitter_name) {
+    const { data: existing } = await supabase
+      .from('requestor_registry')
+      .select('requestor_id')
+      .ilike('requestor_name', formData.submitter_name.trim())
+      .single()
+
+    if (existing) {
+      await supabase.from('cases').update({ requestor_id: existing.requestor_id }).eq('id', newCase.id)
+    } else {
+      // Create new RID
+      const { data: allRids } = await supabase
+        .from('requestor_registry')
+        .select('requestor_id')
+        .order('requestor_id', { ascending: false })
+        .limit(1)
+      const lastNum = allRids?.[0]?.requestor_id ? parseInt(allRids[0].requestor_id.replace('RID', '')) : 0
+      const newRid = `RID${String(lastNum + 1).padStart(4, '0')}`
+      await supabase.from('requestor_registry').insert([{ requestor_name: formData.submitter_name.trim(), requestor_id: newRid }])
+      await supabase.from('cases').update({ requestor_id: newRid }).eq('id', newCase.id)
     }
+  } else {
+    // Anonymous — assign RID0050
+    await supabase.from('cases').update({ requestor_id: 'RID0050' }).eq('id', newCase.id)
+  }
+}
 
     // Send confirmation email if email was provided
     if (formData.submitter_email) {
