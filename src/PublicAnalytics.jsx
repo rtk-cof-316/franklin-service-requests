@@ -249,7 +249,49 @@ function PublicAnalytics() {
           <ScoreCard value={avgDaysToResolve} label="Avg Days to Resolve" color="#7c3aed" />
           <ScoreCard value={resolutionRate} label="Resolution Rate" color="#0891b2" />
         </div>
+{/* Case Outcome Breakdown */}
+{(() => {
+  const resolved = cases.filter(c => ['resolved','closed'].includes((c.statuses?.name||'').toLowerCase())).length
+  const lacksResources = cases.filter(c => (c.statuses?.name||'').toLowerCase() === 'lacks resources to resolve').length
+  const unfounded = cases.filter(c => (c.statuses?.name||'').toLowerCase() === 'unfounded').length
+  const inProgress = cases.length - resolved - lacksResources - unfounded
+  const total = cases.length || 1
+  const segments = [
+    { label: 'Resolved / Closed', count: resolved, color: '#16a34a', pct: Math.round((resolved/total)*100) },
+    { label: 'In Progress', count: inProgress, color: '#1a56a0', pct: Math.round((inProgress/total)*100) },
+    { label: 'Lacks Resources to Resolve', count: lacksResources, color: '#dc2626', pct: Math.round((lacksResources/total)*100) },
+    { label: 'Unfounded', count: unfounded, color: '#d97706', pct: Math.round((unfounded/total)*100) },
+  ].filter(s => s.count > 0)
 
+  return (
+    <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '24px' }}>
+      <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>📊 Case Outcomes — What Happened to Every Request</div>
+      
+      {/* Stacked bar */}
+      <div style={{ display: 'flex', height: '32px', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
+        {segments.map(s => (
+          <div key={s.label} style={{ width: `${s.pct}%`, backgroundColor: s.color, minWidth: s.count > 0 ? '2px' : '0' }} title={`${s.label}: ${s.count}`} />
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+        {segments.map(s => (
+          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: s.color, flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', color: '#374151' }}>{s.label}</span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: s.color }}>{s.pct}%</span>
+            <span style={{ fontSize: '12px', color: '#9ca3af' }}>({s.count})</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280', lineHeight: '1.6' }}>
+        "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified. These outcomes are reported transparently as part of our commitment to open government.
+      </div>
+    </div>
+  )
+})()}
         <SectionCard title="📋 Cases by Department">
           <BarChart data={deptData} labelKey="dept" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
@@ -293,7 +335,7 @@ function PublicAnalytics() {
     {[
       { status: 'Closed', color: '#065f46', bg: '#d1fae5', desc: 'The request has been fulfilled and records have been released.' },
       { status: 'Gathering Records', color: '#1e40af', bg: '#dbeafe', desc: 'The City is actively searching for and collecting the requested records.' },
-      { status: 'Reviewing Records', color: '#1e40af', bg: '#dbeafe', desc: 'Records have been collected and are currently under legal review before release.' },
+      { status: 'Reviewing Records', color: '#1e40af', bg: '#dbeafe', desc: 'Records have been collected and are currently under review before release.' },
       { status: 'Request Abandoned', color: '#991b1b', bg: '#fee2e2', desc: 'The requestor has not scheduled a pick up of their records and the request has been closed.' },
       { status: 'Clarification Needed', color: '#92400e', bg: '#fef3c7', desc: 'The City needs additional information from the requestor to proceed.' },
       { status: 'Records Ready - Please Schedule Pick Up', color: '#92400e', bg: '#fef3c7', desc: 'Records are ready and the requestor needs to schedule an appointment.' },
