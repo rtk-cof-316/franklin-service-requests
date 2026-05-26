@@ -287,7 +287,7 @@ function PublicAnalytics() {
       </div>
 
       <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280', lineHeight: '1.6' }}>
-        "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified. These outcomes are reported transparently as part of our commitment to open government.
+        "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified.
       </div>
     </div>
   )
