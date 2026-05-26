@@ -38,19 +38,19 @@ function isWithin5BusinessDays(submitted, acknowledged) {
 const BAR_COLORS = ['#1a56a0','#2563eb','#3b82f6','#60a5fa','#93c5fd','#1e40af','#1d4ed8','#0284c7','#0369a1','#075985']
 
 function BarChart({ data, labelKey, valueKey, colorFn }) {
-  if (!data || data.length === 0) return <div style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic' }}>No data available.</div>
+  if (!data || data.length === 0) return <div style={{ fontSize: '15px', color: '#6b7280', fontStyle: 'italic' }}>No data available.</div>
   const max = Math.max(...data.map(d => d[valueKey]), 1)
   return (
     <div>
       {data.map((d, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-          <div style={{ fontSize: '12px', color: '#374151', width: '200px', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+          <div style={{ fontSize: '14px', color: '#374151', width: '220px', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {d[labelKey]}
           </div>
-          <div style={{ flex: 1, backgroundColor: '#f3f4f6', borderRadius: '4px', height: '22px', overflow: 'hidden' }}>
+          <div style={{ flex: 1, backgroundColor: '#e5e7eb', borderRadius: '4px', height: '24px', overflow: 'hidden' }}>
             <div style={{ height: '100%', backgroundColor: colorFn ? colorFn(i) : '#1a56a0', borderRadius: '4px', width: `${(d[valueKey] / max) * 100}%`, minWidth: d[valueKey] > 0 ? '4px' : '0' }} />
           </div>
-          <div style={{ fontSize: '12px', color: '#6b7280', width: '40px', textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: '14px', color: '#374151', fontWeight: '600', width: '40px', textAlign: 'right', flexShrink: 0 }}>
             {d[valueKey]}
           </div>
         </div>
@@ -62,18 +62,19 @@ function BarChart({ data, labelKey, valueKey, colorFn }) {
 function ScoreCard({ value, label, sub, color = '#1a56a0' }) {
   return (
     <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px 24px', flex: '1', minWidth: '140px', borderTop: `4px solid ${color}` }}>
-      <div style={{ fontSize: '30px', fontWeight: '700', color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6b7280', marginTop: '6px' }}>{label}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{sub}</div>}
+      <div style={{ fontSize: '32px', fontWeight: '700', color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#374151', marginTop: '8px' }}>{label}</div>
+      {sub && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{sub}</div>}
     </div>
   )
 }
 
-function SectionCard({ title, children }) {
+function SectionCard({ title, description, children }) {
   return (
     <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: '24px' }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-        <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>{title}</span>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+        <div style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: description ? '6px' : '0' }}>{title}</div>
+        {description && <div style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.6' }}>{description}</div>}
       </div>
       <div style={{ padding: '20px' }}>{children}</div>
     </div>
@@ -132,7 +133,7 @@ function PublicAnalytics() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Segoe UI', Arial, sans-serif" }}>
-      <div style={{ fontSize: '14px', color: '#6b7280' }}>Loading analytics...</div>
+      <div style={{ fontSize: '16px', color: '#6b7280' }}>Loading analytics...</div>
     </div>
   )
 
@@ -213,7 +214,6 @@ function PublicAnalytics() {
     .slice(0, 10)
     .map(([rid, count]) => ({ label: rid, count }))
 
-  // 91-A public log table
   const rtkTableCases = rtkCases.map(c => {
     const detail = rtkDetails.find(d => d.case_id === c.id)
     return { ...c, detail }
@@ -232,12 +232,25 @@ function PublicAnalytics() {
     return true
   }).sort((a, b) => new Date(b.date_submitted) - new Date(a.date_submitted))
 
+  // Outcome breakdown
+  const resolved = cases.filter(c => ['resolved','closed'].includes((c.statuses?.name||'').toLowerCase())).length
+  const lacksResources = cases.filter(c => (c.statuses?.name||'').toLowerCase() === 'lacks resources to resolve').length
+  const unfounded = cases.filter(c => (c.statuses?.name||'').toLowerCase() === 'unfounded').length
+  const inProgress = cases.length - resolved - lacksResources - unfounded
+  const total = cases.length || 1
+  const outcomeSegments = [
+    { label: 'Resolved / Closed', count: resolved, color: '#16a34a', pct: Math.round((resolved/total)*100) },
+    { label: 'In Progress', count: inProgress, color: '#1a56a0', pct: Math.round((inProgress/total)*100) },
+    { label: 'Lacks Resources to Resolve', count: lacksResources, color: '#dc2626', pct: Math.round((lacksResources/total)*100) },
+    { label: 'Unfounded', count: unfounded, color: '#d97706', pct: Math.round((unfounded/total)*100) },
+  ].filter(s => s.count > 0)
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8', fontFamily: "'Segoe UI', Arial, sans-serif" }}>
 
       <div style={{ backgroundColor: '#1a56a0', padding: '32px 32px 28px 32px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#e8eef6', margin: '0 0 4px 0' }}>📊 City of Franklin — Service Request Analytics</h1>
-        <p style={{ fontSize: '14px', color: '#93afd4', margin: 0 }}>Public transparency dashboard — Franklin, New Hampshire</p>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#e8eef6', margin: '0 0 6px 0' }}>📊 City of Franklin — Service Request Analytics</h1>
+        <p style={{ fontSize: '16px', color: '#93afd4', margin: 0 }}>Public transparency dashboard — Franklin, New Hampshire</p>
       </div>
 
       <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
@@ -249,64 +262,57 @@ function PublicAnalytics() {
           <ScoreCard value={avgDaysToResolve} label="Avg Days to Resolve" color="#7c3aed" />
           <ScoreCard value={resolutionRate} label="Resolution Rate" color="#0891b2" />
         </div>
-{/* Case Outcome Breakdown */}
-{(() => {
-  const resolved = cases.filter(c => ['resolved','closed'].includes((c.statuses?.name||'').toLowerCase())).length
-  const lacksResources = cases.filter(c => (c.statuses?.name||'').toLowerCase() === 'lacks resources to resolve').length
-  const unfounded = cases.filter(c => (c.statuses?.name||'').toLowerCase() === 'unfounded').length
-  const inProgress = cases.length - resolved - lacksResources - unfounded
-  const total = cases.length || 1
-  const segments = [
-    { label: 'Resolved / Closed', count: resolved, color: '#16a34a', pct: Math.round((resolved/total)*100) },
-    { label: 'In Progress', count: inProgress, color: '#1a56a0', pct: Math.round((inProgress/total)*100) },
-    { label: 'Lacks Resources to Resolve', count: lacksResources, color: '#dc2626', pct: Math.round((lacksResources/total)*100) },
-    { label: 'Unfounded', count: unfounded, color: '#d97706', pct: Math.round((unfounded/total)*100) },
-  ].filter(s => s.count > 0)
 
-  return (
-    <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '24px' }}>
-      <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>📊 Case Outcomes — What Happened to Every Request</div>
-      
-      {/* Stacked bar */}
-      <div style={{ display: 'flex', height: '32px', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
-        {segments.map(s => (
-          <div key={s.label} style={{ width: `${s.pct}%`, backgroundColor: s.color, minWidth: s.count > 0 ? '2px' : '0' }} title={`${s.label}: ${s.count}`} />
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-        {segments.map(s => (
-          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', color: '#374151' }}>{s.label}</span>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: s.color }}>{s.pct}%</span>
-            <span style={{ fontSize: '12px', color: '#9ca3af' }}>({s.count})</span>
+        {/* Case Outcome Breakdown */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '24px' }}>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>📊 Case Outcomes — What Happened to Every Request</div>
+          <div style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.6', marginBottom: '16px' }}>
+            This chart shows the outcome of every service request submitted to the City. Most cases are resolved. We believe in being transparent about cases where resolution wasn't possible — and starting that conversation with our community.
           </div>
-        ))}
-      </div>
+          <div style={{ display: 'flex', height: '34px', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
+            {outcomeSegments.map(s => (
+              <div key={s.label} style={{ width: `${s.pct}%`, backgroundColor: s.color, minWidth: s.count > 0 ? '2px' : '0' }} title={`${s.label}: ${s.count}`} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+            {outcomeSegments.map(s => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: '14px', color: '#374151' }}>{s.label}</span>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: s.color }}>{s.pct}%</span>
+                <span style={{ fontSize: '13px', color: '#9ca3af' }}>({s.count})</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '14px', padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '14px', color: '#4b5563', lineHeight: '1.6' }}>
+            "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified. These outcomes are reported transparently as part of our commitment to open government.
+          </div>
+        </div>
 
-      <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280', lineHeight: '1.6' }}>
-        "Lacks Resources to Resolve" and "Unfounded" cases represent situations where the City either did not have the capacity to address the issue or the reported issue could not be verified.
-      </div>
-    </div>
-  )
-})()}
-        <SectionCard title="📋 Cases by Department">
+        <SectionCard
+          title="📋 Cases by Department"
+          description="This chart shows how service requests are distributed across City departments. Each department is responsible for addressing the issues assigned to them. A higher volume reflects the demand placed on that department by our community."
+        >
           <BarChart data={deptData} labelKey="dept" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
 
-        <SectionCard title="🔧 Cases by Issue Type">
+        <SectionCard
+          title="🔧 Cases by Issue Type"
+          description="What are Franklin residents reporting most? This breakdown shows the types of issues submitted by the community, helping the City identify patterns, prioritize resources, and address the most common concerns."
+        >
           <BarChart data={typeData} labelKey="type" valueKey="count" />
         </SectionCard>
 
-        <SectionCard title="📅 Monthly Case Volume">
+        <SectionCard
+          title="📅 Monthly Case Volume"
+          description="Tracking how many requests come in each month helps us understand seasonal trends and measure our responsiveness over time. Consistent volume shows an engaged community — and a City that's listening."
+        >
           <BarChart data={monthlyData} labelKey="label" valueKey="count" />
         </SectionCard>
 
         <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '16px 20px', marginBottom: '24px' }}>
-          <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a56a0', marginBottom: '4px' }}>⚖️ Right-to-Know Requests (RSA 91-A)</div>
-          <div style={{ fontSize: '13px', color: '#3b82f6' }}>Public transparency data on records requests filed with the City of Franklin</div>
+          <div style={{ fontSize: '18px', fontWeight: '700', color: '#1a56a0', marginBottom: '4px' }}>⚖️ Right-to-Know Requests (RSA 91-A)</div>
+          <div style={{ fontSize: '15px', color: '#1e40af', lineHeight: '1.6' }}>Public transparency data on records requests filed with the City of Franklin. Under New Hampshire's Right-to-Know Law, residents have the right to request access to public records. The data below reflects how we are fulfilling that responsibility.</div>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
@@ -317,53 +323,58 @@ function PublicAnalytics() {
           <ScoreCard value={formatMoney(totalFees)} label="Fees Collected" color="#0891b2" />
         </div>
 
-        <SectionCard title="📁 Requests by Topic">
+        <SectionCard
+          title="📁 Requests by Topic"
+          description="Right-to-Know requests cover a wide range of public records. This chart shows which categories of records are most frequently requested, reflecting the areas of City government that residents are most interested in."
+        >
           <BarChart data={topicData} labelKey="topic" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
 
-        <SectionCard title="🔁 Top Repeat Requestors">
-          <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px', lineHeight: '1.5' }}>
-            Requestors are identified by their assigned Requestor ID. Names are not displayed publicly.
-          </p>
+        <SectionCard
+          title="🔁 Top Repeat Requestors"
+          description="Some individuals file multiple Right-to-Know requests over time. Requestors are identified by assigned ID numbers only — no names are displayed publicly. This chart reflects the volume of requests from our most active filers."
+        >
           <BarChart data={repeatRequestors} labelKey="label" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
 
-{/* 91-A Status Key */}
-<div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '16px' }}>
-  <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>🔑 Status Guide</div>
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-    {[
-      { status: 'Closed', color: '#065f46', bg: '#d1fae5', desc: 'The request has been fulfilled and records have been released.' },
-      { status: 'Gathering Records', color: '#1e40af', bg: '#dbeafe', desc: 'The City is actively searching for and collecting the requested records.' },
-      { status: 'Reviewing Records', color: '#1e40af', bg: '#dbeafe', desc: 'Records have been collected and are currently under review before release.' },
-      { status: 'Request Abandoned', color: '#991b1b', bg: '#fee2e2', desc: 'The requestor has not scheduled a pick up of their records and the request has been closed.' },
-      { status: 'Clarification Needed', color: '#92400e', bg: '#fef3c7', desc: 'The City needs additional information from the requestor to proceed.' },
-      { status: 'Records Ready - Please Schedule Pick Up', color: '#92400e', bg: '#fef3c7', desc: 'Records are ready and the requestor needs to schedule an appointment.' },
-    ].map(({ status, color, bg, desc }) => (
-      <div key={status} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-        <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: bg, color, marginBottom: '10px', display: 'inline-block' }}>{status}</span>
-        <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.6' }}>{desc}</span>
-      </div>
-    ))}
-  </div>
-</div>
+        {/* 91-A Status Key */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>🔑 Status Guide</div>
+          <div style={{ fontSize: '14px', color: '#4b5563', marginBottom: '16px', lineHeight: '1.6' }}>Not sure what a status means? Here's a plain-language explanation of each one.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+            {[
+              { status: 'Closed', color: '#065f46', bg: '#d1fae5', desc: 'The request has been fulfilled and records have been released.' },
+              { status: 'Gathering Records', color: '#1e40af', bg: '#dbeafe', desc: 'The City is actively searching for and collecting the requested records.' },
+              { status: 'Reviewing Records', color: '#1e40af', bg: '#dbeafe', desc: 'Records have been collected and are currently under legal review before release.' },
+              { status: 'Request Abandoned', color: '#991b1b', bg: '#fee2e2', desc: 'The requestor has not scheduled a pick up of their records and the request has been closed.' },
+              { status: 'Clarification Needed', color: '#92400e', bg: '#fef3c7', desc: 'The City needs additional information from the requestor to proceed.' },
+              { status: 'Records Ready - Please Schedule Pick Up', color: '#92400e', bg: '#fef3c7', desc: 'Records are ready and the requestor needs to schedule an appointment.' },
+            ].map(({ status, color, bg, desc }) => (
+              <div key={status} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', backgroundColor: bg, color, marginBottom: '10px', display: 'inline-block' }}>{status}</span>
+                <span style={{ fontSize: '13px', color: '#4b5563', lineHeight: '1.6' }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* 91-A Public Log */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: '24px' }}>
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-            <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>📜 Public Right-to-Know Request Log</span>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>📜 Public Right-to-Know Request Log</div>
+            <div style={{ fontSize: '14px', color: '#4b5563', lineHeight: '1.6', marginBottom: '12px' }}>A complete public record of all Right-to-Know requests filed with the City of Franklin. Requestor names are not shown — each person is assigned a unique Requestor ID for privacy.</div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <input
                 type="text"
                 placeholder="Search by case #, RID, topic..."
                 value={rtkSearch}
                 onChange={e => setRtkSearch(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', width: '220px' }}
+                style={{ padding: '8px 12px', fontSize: '14px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', width: '240px' }}
               />
               <select
                 value={rtkStatusFilter}
                 onChange={e => setRtkStatusFilter(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', backgroundColor: '#ffffff' }}
+                style={{ padding: '8px 12px', fontSize: '14px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', backgroundColor: '#ffffff' }}
               >
                 <option value="all">All Statuses</option>
                 <option value="open">Open Only</option>
@@ -385,7 +396,7 @@ function PublicAnalytics() {
                     { label: 'Hours', width: '70px' },
                     { label: 'Fees', width: '80px' },
                   ].map(h => (
-                    <th key={h.label} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#6b7280', backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb', whiteSpace: 'nowrap', width: h.width }}>{h.label}</th>
+                    <th key={h.label} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: '#6b7280', backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb', whiteSpace: 'nowrap', width: h.width }}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -405,24 +416,24 @@ function PublicAnalytics() {
                 <tbody>
                   {rtkTableCases.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: '13px' }}>No records found.</td>
+                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic', fontSize: '14px' }}>No records found.</td>
                     </tr>
                   ) : rtkTableCases.map(c => (
                     <tr key={c.id}>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', color: '#1a56a0' }}>{c.case_number}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDate(c.date_submitted)}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', fontWeight: '600' }}>{c.requestor_id || '—'}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.detail?.request_topic || '—'}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151' }}>
-                        <div style={{ maxHeight: '60px', overflowY: 'auto', lineHeight: '1.4' }}>{c.description || '—'}</div>
+                      <td style={{ padding: '10px 12px', fontSize: '14px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', color: '#1a56a0' }}>{c.case_number}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', whiteSpace: 'nowrap' }}>{formatDate(c.date_submitted)}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '14px', borderBottom: '1px solid #f3f4f6', color: '#374151', fontWeight: '600' }}>{c.requestor_id || '—'}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.detail?.request_topic || '—'}</td>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151' }}>
+                        <div style={{ maxHeight: '60px', overflowY: 'auto', lineHeight: '1.5' }}>{c.description || '—'}</div>
                       </td>
-                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6' }}>
                         <span style={getStatusStyle(c.statuses?.name)}>{c.statuses?.name || '—'}</span>
                       </td>
-                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151', textAlign: 'right' }}>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', textAlign: 'right' }}>
                         {c.detail?.hours_worked ? parseFloat(c.detail.hours_worked).toFixed(1) : '—'}
                       </td>
-                      <td style={{ padding: '10px 12px', fontSize: '12px', borderBottom: '1px solid #f3f4f6', color: '#374151', textAlign: 'right' }}>
+                      <td style={{ padding: '10px 12px', fontSize: '13px', borderBottom: '1px solid #f3f4f6', color: '#374151', textAlign: 'right' }}>
                         {c.detail?.fees_collected ? `$${parseFloat(c.detail.fees_collected).toFixed(2)}` : '—'}
                       </td>
                     </tr>
@@ -431,12 +442,12 @@ function PublicAnalytics() {
               </table>
             </div>
           </div>
-          <div style={{ padding: '8px 20px', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb', fontSize: '11px', color: '#9ca3af' }}>
+          <div style={{ padding: '10px 20px', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb', fontSize: '13px', color: '#6b7280' }}>
             Showing {rtkTableCases.length} of {rtkCases.length} requests. Requestor names are not displayed publicly — Requestor IDs are assigned for tracking purposes only.
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', paddingBottom: '24px' }}>
+        <div style={{ textAlign: 'center', fontSize: '13px', color: '#6b7280', paddingBottom: '24px' }}>
           Data updated in real time. City of Franklin, New Hampshire — Office of the City Manager.
         </div>
       </div>
