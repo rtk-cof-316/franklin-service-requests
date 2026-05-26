@@ -286,6 +286,26 @@ function PublicAnalytics() {
           <BarChart data={repeatRequestors} labelKey="label" valueKey="count" colorFn={i => BAR_COLORS[i % BAR_COLORS.length]} />
         </SectionCard>
 
+{/* 91-A Status Key */}
+<div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '16px' }}>
+  <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '14px' }}>🔑 Status Guide</div>
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+    {[
+      { status: 'Closed', color: '#065f46', bg: '#d1fae5', desc: 'The request has been fulfilled and records have been released.' },
+      { status: 'Gathering Records', color: '#1e40af', bg: '#dbeafe', desc: 'The City is actively searching for and collecting the requested records.' },
+      { status: 'Reviewing Records', color: '#1e40af', bg: '#dbeafe', desc: 'Records have been collected and are currently under legal review before release.' },
+      { status: 'Request Abandoned', color: '#991b1b', bg: '#fee2e2', desc: 'The requestor has not scheduled a pick up of their records and the request has been closed.' },
+      { status: 'Clarification Needed', color: '#92400e', bg: '#fef3c7', desc: 'The City needs additional information from the requestor to proceed.' },
+      { status: 'Records Ready - Please Schedule Pick Up', color: '#92400e', bg: '#fef3c7', desc: 'Records are ready and the requestor needs to schedule an appointment.' },
+    ].map(({ status, color, bg, desc }) => (
+      <div key={status} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', backgroundColor: bg, color, whiteSpace: 'nowrap', flexShrink: 0 }}>{status}</span>
+        <span style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.5' }}>{desc}</span>
+      </div>
+    ))}
+  </div>
+</div>
+
         {/* 91-A Public Log */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: '24px' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
