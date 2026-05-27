@@ -37,6 +37,32 @@ function App() {
     })
     return () => subscription.unsubscribe()
   }, [])
+  // Auto logout after 5 minutes of inactivity
+useEffect(() => {
+  if (!session) return
+
+  let timer
+
+  function resetTimer() {
+    clearTimeout(timer)
+    timer = setTimeout(async () => {
+      await supabase.auth.signOut()
+      setPage('submit')
+      setUserRole(null)
+      setUserDepartmentId(null)
+      setViewingCaseId(null)
+    }, 5 * 60 * 1000) // 5 minutes
+  }
+
+  const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+  events.forEach(e => window.addEventListener(e, resetTimer))
+  resetTimer()
+
+  return () => {
+    clearTimeout(timer)
+    events.forEach(e => window.removeEventListener(e, resetTimer))
+  }
+}, [session])
 
   async function loadUserProfile(userId) {
     const { data } = await supabase
