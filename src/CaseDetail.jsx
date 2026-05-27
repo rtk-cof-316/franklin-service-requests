@@ -346,6 +346,7 @@ async function logAudit(caseId, action, performedBy) {
 
 const DELIVERY_METHODS = ['City USB', 'Self USB', 'In Person Viewing', 'Print', 'Mailed', 'Hold for Pick Up']
 const APPOINTMENT_METHODS = ['City USB', 'Self USB', 'In Person Viewing', 'Print']
+const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 
 function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onPrintWorkOrder, onPrintCaseDetail }) {
   const [caseData, setCaseData] = useState(null)
@@ -384,6 +385,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     hours_worked_closed: '',
     fees_assessed: '',
     fees_collected: '',
+    tax_dollar_spent: '',
     date_records_ready: '',
     date_requestor_notified: '',
     appointment_datetime: '',
@@ -391,8 +393,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     mailed: false,
     tracking_number: '',
     hold_for_pickup: false,
-    public_records_url: '',
-    tax_dollar_spent: '',
   })
   const [savingRtk, setSavingRtk] = useState(false)
   const [rtkSuccess, setRtkSuccess] = useState(false)
@@ -458,6 +458,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         hours_worked_closed: data.hours_worked_closed != null ? data.hours_worked_closed.toString() : '',
         fees_assessed: data.fees_assessed != null ? data.fees_assessed.toString() : '',
         fees_collected: data.fees_collected != null ? data.fees_collected.toString() : '',
+        tax_dollar_spent: data.tax_dollar_spent != null ? data.tax_dollar_spent.toString() : '',
         date_records_ready: data.date_records_ready ? data.date_records_ready.slice(0, 10) : '',
         date_requestor_notified: data.date_requestor_notified ? data.date_requestor_notified.slice(0, 10) : '',
         appointment_datetime: data.appointment_datetime ? data.appointment_datetime.slice(0, 16) : '',
@@ -465,8 +466,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         mailed: data.mailed || false,
         tracking_number: data.tracking_number || '',
         hold_for_pickup: data.hold_for_pickup || false,
-        public_records_url: data.public_records_url || '',
-        tax_dollar_spent: data.tax_dollar_spent != null ? data.tax_dollar_spent.toString() : '',
       })
     }
   }
@@ -602,6 +601,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         hours_worked_closed: rtkFields.hours_worked_closed !== '' ? parseFloat(rtkFields.hours_worked_closed) : null,
         fees_assessed: rtkFields.fees_assessed !== '' ? parseFloat(rtkFields.fees_assessed) : null,
         fees_collected: rtkFields.fees_collected !== '' ? parseFloat(rtkFields.fees_collected) : null,
+        tax_dollar_spent: rtkFields.tax_dollar_spent !== '' ? parseFloat(rtkFields.tax_dollar_spent) : null,
         date_records_ready: rtkFields.date_records_ready || null,
         date_requestor_notified: rtkFields.date_requestor_notified || null,
         appointment_datetime: rtkFields.appointment_datetime || null,
@@ -609,8 +609,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
         mailed: rtkFields.mailed,
         tracking_number: rtkFields.tracking_number || null,
         hold_for_pickup: rtkFields.hold_for_pickup,
-        public_records_url: rtkFields.public_records_url || null,
-        tax_dollar_spent: rtkFields.tax_dollar_spent !== '' ? parseFloat(rtkFields.tax_dollar_spent) : null,
       })
       .eq('case_id', caseId)
       .select()
@@ -624,12 +622,12 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       const oldHoursClosed = rtkData?.hours_worked_closed != null ? rtkData.hours_worked_closed.toString() : ''
       const oldFeeAssessed = rtkData?.fees_assessed != null ? rtkData.fees_assessed.toString() : ''
       const oldFeeCollected = rtkData?.fees_collected != null ? rtkData.fees_collected.toString() : ''
+      const oldTaxDollar = rtkData?.tax_dollar_spent != null ? rtkData.tax_dollar_spent.toString() : ''
       const oldDelivery = rtkData?.delivery_method || ''
       const oldTracking = rtkData?.tracking_number || ''
       const oldRecordsReady = rtkData?.date_records_ready?.slice(0, 10) || ''
       const oldNotified = rtkData?.date_requestor_notified?.slice(0, 10) || ''
       const oldAppt = rtkData?.appointment_datetime?.slice(0, 16) || ''
-      const oldUrl = rtkData?.public_records_url || ''
 
       if (rtkFields.acknowledged_date !== oldAck) changes.push('Acknowledged date updated')
       if (rtkFields.request_topic !== oldTopic) changes.push(`Request topic set to "${rtkFields.request_topic}"`)
@@ -638,12 +636,12 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       if (rtkFields.hours_worked_closed !== oldHoursClosed) changes.push('Hours worked (final) updated')
       if (rtkFields.fees_assessed !== oldFeeAssessed) changes.push('Fees assessed updated')
       if (rtkFields.fees_collected !== oldFeeCollected) changes.push('Fees collected updated')
+      if (rtkFields.tax_dollar_spent !== oldTaxDollar) changes.push('Tax dollars spent updated')
       if (rtkFields.date_records_ready !== oldRecordsReady) changes.push('Date records ready updated')
       if (rtkFields.date_requestor_notified !== oldNotified) changes.push('Date requestor notified updated')
       if (rtkFields.appointment_datetime !== oldAppt) changes.push('Appointment date/time updated')
       if (rtkFields.delivery_method !== oldDelivery) changes.push(`Delivery method set to "${rtkFields.delivery_method}"`)
       if (rtkFields.tracking_number !== oldTracking) changes.push('Tracking number updated')
-      if (rtkFields.public_records_url !== oldUrl) changes.push('Public records URL updated')
 
       const auditMessage = changes.length > 0
         ? `91-A details updated: ${changes.join(', ')}`
@@ -687,33 +685,29 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     }])
     await logAudit(caseId, `Assigned to ${deptName}`, userEmail)
 
-    // Get all users in this department and their emails
-try {
-  console.log('Sending dept notification for dept:', parseInt(selectedDept))
-  const response = await fetch(
-    'https://sdibtkmmcegthmytmzvy.supabase.co/functions/v1/send-confirmation-email',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        type: 'department_assignment',
-        departmentId: parseInt(selectedDept),
-        caseNumber: caseData.case_number,
-        location: caseData.location,
-        description: caseData.description,
-        departmentName: deptName,
-      }),
+    try {
+      await fetch(
+        `${SUPABASE_URL}/functions/v1/send-confirmation-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'department_assignment',
+            departmentId: parseInt(selectedDept),
+            caseNumber: caseData.case_number,
+            location: caseData.location,
+            description: caseData.description,
+            departmentName: deptName,
+          }),
+        }
+      )
+    } catch (e) {
+      console.error('Email notification error:', e)
     }
-  )
-  const result = await response.json()
-  console.log('Email function response:', result)
-} catch (e) {
-  console.error('Email notification error:', e)
-}
-    
+
     setSelectedDept('')
     await loadCase()
     await loadAuditLog()
@@ -838,24 +832,24 @@ try {
                 </div>
 
                 <div style={styles.sectionDivider}>Fees</div>
-<div style={styles.twoCol}>
-  <div>
-    <div style={styles.fieldLabel}>Fees Assessed ($)</div>
-    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_assessed}
-      onChange={e => setRtkFields(prev => ({ ...prev, fees_assessed: e.target.value }))} />
-  </div>
-  <div>
-    <div style={styles.fieldLabel}>Fees Collected ($)</div>
-    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_collected}
-      onChange={e => setRtkFields(prev => ({ ...prev, fees_collected: e.target.value }))} />
-  </div>
-</div>
-<div style={{ maxWidth: '50%', paddingRight: '5px' }}>
-  <div style={styles.fieldLabel}>Tax Dollars Spent ($)</div>
-  <div style={styles.inputHint}>Total cost to the city for fulfilling this request</div>
-  <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.tax_dollar_spent || ''}
-    onChange={e => setRtkFields(prev => ({ ...prev, tax_dollar_spent: e.target.value }))} />
-</div>
+                <div style={styles.twoCol}>
+                  <div>
+                    <div style={styles.fieldLabel}>Fees Assessed ($)</div>
+                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_assessed}
+                      onChange={e => setRtkFields(prev => ({ ...prev, fees_assessed: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div style={styles.fieldLabel}>Fees Collected ($)</div>
+                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_collected}
+                      onChange={e => setRtkFields(prev => ({ ...prev, fees_collected: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
+                  <div style={styles.fieldLabel}>Tax Dollars Spent ($)</div>
+                  <div style={styles.inputHint}>Total cost to the city for fulfilling this request</div>
+                  <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.tax_dollar_spent}
+                    onChange={e => setRtkFields(prev => ({ ...prev, tax_dollar_spent: e.target.value }))} />
+                </div>
 
                 <div style={styles.sectionDivider}>Fulfillment</div>
                 <div style={styles.twoCol}>
@@ -894,17 +888,6 @@ try {
                   </>
                 )}
 
-                <div style={styles.sectionDivider}>Public Records</div>
-                <div style={styles.fieldLabel}>Public Records URL</div>
-                <div style={styles.inputHint}>Paste a link here once records have been picked up and are ready for public viewing. This will appear in the public analytics dashboard.</div>
-                <input
-                  type="text"
-                  style={styles.input}
-                  placeholder="https://drive.google.com/..."
-                  value={rtkFields.public_records_url}
-                  onChange={e => setRtkFields(prev => ({ ...prev, public_records_url: e.target.value }))}
-                />
-
                 <button style={savingRtk ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveRtk} disabled={savingRtk}>
                   {savingRtk ? 'Saving...' : 'Save 91-A Details'}
                 </button>
@@ -923,6 +906,9 @@ try {
                   <div><strong>Name:</strong> {caseData.submitter_name || 'Anonymous'}</div>
                   <div><strong>Email:</strong> {caseData.submitter_email || '—'}</div>
                   <div><strong>Phone:</strong> {caseData.submitter_phone || '—'}</div>
+                  {caseData.requestor_id && (
+                    <div><strong>Requestor ID:</strong> {caseData.requestor_id}</div>
+                  )}
                 </div>
               </div>
             </div>
