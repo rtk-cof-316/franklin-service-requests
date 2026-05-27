@@ -603,7 +603,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
     const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
 
-    const { error } = await supabase
+    const { error: followupError } = await supabase
       .from('cases')
       .update({ followup_due_date: followupDate || null })
       .eq('id', caseId)
@@ -628,24 +628,48 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setSavingDeptId(null)
   }
 
-  async function handleSaveDeptStatus() {
+async function handleSaveDeptStatus() {
     if (!myDeptAssignment) return
     setSavingDeptStatus(true)
     setDeptSaveSuccess(false)
     const oldStatus = myDeptAssignment.statuses?.name
     const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
+    const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
 
-    const { error } = await supabase.from('case_departments').update({ status_id: parseInt(deptSelectedStatus) }).eq('id', myDeptAssignment.id).select()
-    if (!error) {
-      if (newStatus && newStatus !== oldStatus) {
-        await logAudit(caseId, `${myDeptAssignment.departments?.name} updated their status from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
-      }
-      setDeptSaveSuccess(true)
-      await loadCase()
-      await loadAuditLog()
-      setTimeout(() => setDeptSaveSuccess(false), 3000)
+    await supabase
+      .from('cases')
+      .update({ followup_due_date: followupDate || null })
+      .eq('id', caseId)
+
+    await supabase
+      .from('case_departments')
+      .update({ status_id: parseInt(deptSelectedStatus) })
+      .eq('id', myDeptAssignment.id)
+
+    // Build audit message
+    const auditParts = []
+    if (newStatus && newStatus !== oldStatus) {
+      auditParts.push(`${myDeptAssignment.departments?.name} status changed from "${oldStatus || 'none'}" to "${newStatus}"`)
     }
+    if (followupDate !== oldFollowup) {
+      if (followupDate) auditParts.push(`Follow-up due date set to ${followupDate}`)
+      else auditParts.push(`Follow-up due date cleared`)
+    }
+
+    if (auditParts.length > 0) {
+      await supabase.from('case_audit_log').insert([{
+        case_id: caseId,
+        action: auditParts.join(', '),
+        performed_by: userEmail,
+        created_at: new Date().toISOString(),
+      }])
+    }
+
+    setDeptSaveSuccess(true)
+    await loadCase()
+    await loadAuditLog()
     setSavingDeptStatus(false)
+    setTimeout(() => setDeptSaveSuccess(false), 3000)
   }
 
   async function handleSaveRtk() {
