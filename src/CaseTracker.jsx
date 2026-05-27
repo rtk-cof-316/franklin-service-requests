@@ -27,6 +27,7 @@ const styles = {
     fontSize: '22px',
     fontWeight: '700',
     letterSpacing: '0.3px',
+    color: '#e8eef6',
   },
   headerSub: {
     margin: 0,
