@@ -603,10 +603,24 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
     const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
 
-    const { error } = await supabase.from('case_departments').update({ status_id: newStatusId }).eq('id', cdId).select()
+    const { error } = await supabase
+      .from('cases')
+      .update({ followup_due_date: followupDate || null })
+      .eq('id', caseId)
+
+    await supabase
+      .from('case_departments')
+      .update({ status_id: parseInt(deptSelectedStatus) })
+      .eq('id', myDeptAssignment.id)
+      .select()
     if (!error) {
       if (newStatusName && newStatusName !== oldStatusName) {
         await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
+      }
+      const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
+      if (followupDate !== oldFollowup) {
+        if (followupDate) await logAudit(caseId, `Follow-up due date set to ${followupDate} by ${myDeptAssignment.departments?.name}`, userEmail)
+        else await logAudit(caseId, `Follow-up due date cleared by ${myDeptAssignment.departments?.name}`, userEmail)
       }
       await loadCase()
       await loadAuditLog()
@@ -1052,25 +1066,33 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
           {/* Dept user status panel */}
           {!isAdmin && myDeptAssignment && (
-            <div style={styles.card}>
-              <div style={styles.cardHeader}>
-                <span style={styles.cardTitle}>My Department Status</span>
-              </div>
-              <div style={styles.cardBody}>
-                {deptSaveSuccess && <div style={styles.successMsg}>Status updated successfully.</div>}
-                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
-                  Update your department's status. This does not affect the overall case status.
-                </div>
-                <select style={styles.select} value={deptSelectedStatus} onChange={e => setDeptSelectedStatus(e.target.value)}>
-                  <option value="">-- Select status --</option>
-                  {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <button style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveDeptStatus} disabled={savingDeptStatus}>
-                  {savingDeptStatus ? 'Saving...' : 'Update My Status'}
-                </button>
-              </div>
-            </div>
-          )}
+  <div style={styles.card}>
+    <div style={styles.cardHeader}>
+      <span style={styles.cardTitle}>My Department Status</span>
+    </div>
+    <div style={styles.cardBody}>
+      {deptSaveSuccess && <div style={styles.successMsg}>Status updated successfully.</div>}
+      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
+        Update your department's status and follow-up date for this case.
+      </div>
+      <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Your Department's Status</div>
+      <select style={styles.select} value={deptSelectedStatus} onChange={e => setDeptSelectedStatus(e.target.value)}>
+        <option value="">-- Select status --</option>
+        {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      <div style={{ ...styles.fieldLabel, marginBottom: '4px' }}>Follow-up Due Date</div>
+      <div style={styles.inputHint}>Clear this date to remove from follow-up tracking</div>
+      <input type="date" style={styles.input} value={followupDate} onChange={e => setFollowupDate(e.target.value)} />
+      <button
+        style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn}
+        onClick={handleSaveDeptStatus}
+        disabled={savingDeptStatus}
+      >
+        {savingDeptStatus ? 'Saving...' : 'Update My Status'}
+      </button>
+    </div>
+  </div>
+)}
 
           {/* Departments panel */}
           <div style={styles.card}>
