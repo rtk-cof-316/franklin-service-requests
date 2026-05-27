@@ -187,11 +187,13 @@ const styles = {
     alignItems: 'center',
     padding: '10px 0',
     borderBottom: '1px solid #f3f4f6',
+    gap: '10px',
   },
   deptName: {
     fontSize: '13px',
     fontWeight: '600',
     color: '#374151',
+    minWidth: '100px',
   },
   deptStatus: {
     fontSize: '12px',
@@ -216,6 +218,13 @@ const styles = {
   noteBox: {
     backgroundColor: '#f9fafb',
     border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    padding: '12px',
+    marginBottom: '10px',
+  },
+  commentBox: {
+    backgroundColor: '#eff6ff',
+    border: '1px solid #bfdbfe',
     borderRadius: '6px',
     padding: '12px',
     marginBottom: '10px',
@@ -255,11 +264,6 @@ const styles = {
     padding: '60px',
     textAlign: 'center',
     color: '#6b7280',
-  },
-  submitterInfo: {
-    fontSize: '13px',
-    color: '#374151',
-    lineHeight: '1.8',
   },
   auditRow: {
     display: 'flex',
@@ -314,14 +318,22 @@ const styles = {
     marginBottom: '12px',
     marginTop: '16px',
   },
+  publicBadge: {
+    fontSize: '11px',
+    color: '#065f46',
+    backgroundColor: '#d1fae5',
+    padding: '2px 8px',
+    borderRadius: '4px',
+    fontWeight: '600',
+  },
 }
 
 function getStatusStyle(name) {
   const s = (name || '').toLowerCase()
   if (s === 'resolved' || s === 'closed') return { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46' }
-  if (s === 'in progress' || s === 'assigned' || s === 'scheduled' || s === 'gathering records' || s === 'reviewing records') return { ...styles.statusBadge, backgroundColor: '#dbeafe', color: '#1e40af' }
-  if (s === 'lacks resources to resolve' || s === 'unfounded' || s === 'request abandoned') return { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b' }
-  if (s === 'clarification needed' || s === 'records ready - please schedule pick up') return { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e' }
+  if (['in progress','assigned','scheduled','gathering records','reviewing records'].includes(s)) return { ...styles.statusBadge, backgroundColor: '#dbeafe', color: '#1e40af' }
+  if (['lacks resources to resolve','unfounded','request abandoned'].includes(s)) return { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b' }
+  if (['clarification needed','records ready - please schedule pick up'].includes(s)) return { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e' }
   return { ...styles.statusBadge, backgroundColor: '#f3f4f6', color: '#374151' }
 }
 
@@ -355,9 +367,11 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [departments, setDepartments] = useState([])
   const [requestTopics, setRequestTopics] = useState([])
   const [notes, setNotes] = useState([])
+  const [comments, setComments] = useState([])
   const [auditLog, setAuditLog] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Case update fields
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedIssueType, setSelectedIssueType] = useState('')
   const [followupDate, setFollowupDate] = useState('')
@@ -365,17 +379,36 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  // Submitter info editing
+  const [submitterName, setSubmitterName] = useState('')
+  const [submitterEmail, setSubmitterEmail] = useState('')
+  const [submitterPhone, setSubmitterPhone] = useState('')
+  const [savingSubmitter, setSavingSubmitter] = useState(false)
+  const [submitterSuccess, setSubmitterSuccess] = useState(false)
+
+  // Dept status editing (admin)
+  const [deptStatusEdits, setDeptStatusEdits] = useState({})
+  const [savingDeptId, setSavingDeptId] = useState(null)
+
+  // Dept status (dept user)
   const [myDeptAssignment, setMyDeptAssignment] = useState(null)
   const [deptSelectedStatus, setDeptSelectedStatus] = useState('')
   const [savingDeptStatus, setSavingDeptStatus] = useState(false)
   const [deptSaveSuccess, setDeptSaveSuccess] = useState(false)
 
+  // Notes
   const [newNote, setNewNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
+  // Public comments
+  const [newComment, setNewComment] = useState('')
+  const [savingComment, setSavingComment] = useState(false)
+
+  // Dept assignment
   const [selectedDept, setSelectedDept] = useState('')
   const [addingDept, setAddingDept] = useState(false)
 
+  // RTK
   const [rtkData, setRtkData] = useState(null)
   const [rtkFields, setRtkFields] = useState({
     acknowledged_date: '',
@@ -399,30 +432,18 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
   const isAdmin = userRole === 'admin'
 
-  useEffect(() => {
-    loadAll()
-  }, [caseId])
+  useEffect(() => { loadAll() }, [caseId])
 
   async function loadAll() {
     setLoading(true)
-    await Promise.all([loadCase(), loadStatuses(), loadIssueTypes(), loadDepartments(), loadRequestTopics(), loadNotes(), loadAuditLog()])
+    await Promise.all([loadCase(), loadStatuses(), loadIssueTypes(), loadDepartments(), loadRequestTopics(), loadNotes(), loadComments(), loadAuditLog()])
     setLoading(false)
   }
 
   async function loadCase() {
     const { data } = await supabase
       .from('cases')
-      .select(`
-        *,
-        statuses ( id, name ),
-        issue_types ( id, name ),
-        case_departments (
-          id,
-          department_id,
-          departments ( name ),
-          statuses ( id, name )
-        )
-      `)
+      .select(`*, statuses ( id, name ), issue_types ( id, name ), case_departments ( id, department_id, departments ( name ), statuses ( id, name ) )`)
       .eq('id', caseId)
       .single()
     if (data) {
@@ -431,6 +452,13 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       setSelectedIssueType(data.issue_types?.id || '')
       setFollowupDate(data.followup_due_date ? data.followup_due_date.slice(0, 10) : '')
       setIs91a(data.is_91a || false)
+      setSubmitterName(data.submitter_name || '')
+      setSubmitterEmail(data.submitter_email || '')
+      setSubmitterPhone(data.submitter_phone || '')
+      // Init dept status edits
+      const edits = {}
+      data.case_departments?.forEach(cd => { edits[cd.id] = cd.statuses?.id || '' })
+      setDeptStatusEdits(edits)
       if (data.is_91a) loadRtkData()
       if (userRole === 'department' && userDepartmentId) {
         const myAssignment = data.case_departments?.find(cd => cd.department_id === userDepartmentId)
@@ -443,11 +471,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   }
 
   async function loadRtkData() {
-    const { data } = await supabase
-      .from('details_91a')
-      .select('*')
-      .eq('case_id', caseId)
-      .single()
+    const { data } = await supabase.from('details_91a').select('*').eq('case_id', caseId).single()
     if (data) {
       setRtkData(data)
       setRtkFields({
@@ -491,20 +515,17 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   }
 
   async function loadNotes() {
-    const { data } = await supabase
-      .from('internal_notes')
-      .select('*')
-      .eq('case_id', caseId)
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('internal_notes').select('*').eq('case_id', caseId).order('created_at', { ascending: false })
     setNotes(data || [])
   }
 
+  async function loadComments() {
+    const { data } = await supabase.from('case_comments').select('*').eq('case_id', caseId).order('created_at', { ascending: false })
+    setComments(data || [])
+  }
+
   async function loadAuditLog() {
-    const { data } = await supabase
-      .from('case_audit_log')
-      .select('*')
-      .eq('case_id', caseId)
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('case_audit_log').select('*').eq('case_id', caseId).order('created_at', { ascending: false })
     setAuditLog(data || [])
   }
 
@@ -521,30 +542,19 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const newIssueType = issueTypes.find(t => t.id === parseInt(selectedIssueType))?.name
     const old91a = caseData.is_91a
 
-    const { error } = await supabase
-      .from('cases')
-      .update({
-        status_id: selectedStatus || null,
-        issue_type_id: selectedIssueType || null,
-        followup_due_date: followupDate || null,
-        is_91a: is91a,
-      })
-      .eq('id', caseId)
-      .select()
+    const { error } = await supabase.from('cases').update({
+      status_id: selectedStatus || null,
+      issue_type_id: selectedIssueType || null,
+      followup_due_date: followupDate || null,
+      is_91a: is91a,
+    }).eq('id', caseId).select()
 
     if (!error) {
-      if (newStatus && newStatus !== oldStatus) {
-        await logAudit(caseId, `Status changed from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
-      }
-      if (newIssueType && newIssueType !== oldIssueType) {
-        await logAudit(caseId, `Issue type changed from "${oldIssueType || 'none'}" to "${newIssueType}"`, userEmail)
-      }
+      if (newStatus && newStatus !== oldStatus) await logAudit(caseId, `Status changed from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
+      if (newIssueType && newIssueType !== oldIssueType) await logAudit(caseId, `Issue type changed from "${oldIssueType || 'none'}" to "${newIssueType}"`, userEmail)
       if (followupDate !== oldFollowup) {
-        if (followupDate) {
-          await logAudit(caseId, `Follow-up due date set to ${followupDate}`, userEmail)
-        } else {
-          await logAudit(caseId, `Follow-up due date cleared`, userEmail)
-        }
+        if (followupDate) await logAudit(caseId, `Follow-up due date set to ${followupDate}`, userEmail)
+        else await logAudit(caseId, `Follow-up due date cleared`, userEmail)
       }
       if (is91a !== old91a) {
         if (is91a) {
@@ -562,6 +572,47 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setSaving(false)
   }
 
+  async function handleSaveSubmitter() {
+    setSavingSubmitter(true)
+    setSubmitterSuccess(false)
+    const changes = []
+    if (submitterName !== (caseData.submitter_name || '')) changes.push('Name updated')
+    if (submitterEmail !== (caseData.submitter_email || '')) changes.push('Email updated')
+    if (submitterPhone !== (caseData.submitter_phone || '')) changes.push('Phone updated')
+
+    const { error } = await supabase.from('cases').update({
+      submitter_name: submitterName || null,
+      submitter_email: submitterEmail || null,
+      submitter_phone: submitterPhone || null,
+    }).eq('id', caseId).select()
+
+    if (!error) {
+      if (changes.length > 0) await logAudit(caseId, `Submitter info updated: ${changes.join(', ')}`, userEmail)
+      setSubmitterSuccess(true)
+      await loadCase()
+      await loadAuditLog()
+      setTimeout(() => setSubmitterSuccess(false), 3000)
+    }
+    setSavingSubmitter(false)
+  }
+
+  async function handleSaveDeptStatusAdmin(cdId, deptName) {
+    setSavingDeptId(cdId)
+    const newStatusId = parseInt(deptStatusEdits[cdId])
+    const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
+    const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
+
+    const { error } = await supabase.from('case_departments').update({ status_id: newStatusId }).eq('id', cdId).select()
+    if (!error) {
+      if (newStatusName && newStatusName !== oldStatusName) {
+        await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
+      }
+      await loadCase()
+      await loadAuditLog()
+    }
+    setSavingDeptId(null)
+  }
+
   async function handleSaveDeptStatus() {
     if (!myDeptAssignment) return
     setSavingDeptStatus(true)
@@ -569,12 +620,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const oldStatus = myDeptAssignment.statuses?.name
     const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
 
-    const { error } = await supabase
-      .from('case_departments')
-      .update({ status_id: parseInt(deptSelectedStatus) })
-      .eq('id', myDeptAssignment.id)
-      .select()
-
+    const { error } = await supabase.from('case_departments').update({ status_id: parseInt(deptSelectedStatus) }).eq('id', myDeptAssignment.id).select()
     if (!error) {
       if (newStatus && newStatus !== oldStatus) {
         await logAudit(caseId, `${myDeptAssignment.departments?.name} updated their status from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
@@ -590,63 +636,41 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   async function handleSaveRtk() {
     setSavingRtk(true)
     setRtkSuccess(false)
-
-    const { error } = await supabase
-      .from('details_91a')
-      .update({
-        acknowledged_date: rtkFields.acknowledged_date || null,
-        request_topic: rtkFields.request_topic || null,
-        number_of_records: rtkFields.number_of_records !== '' ? parseInt(rtkFields.number_of_records) : null,
-        hours_worked: rtkFields.hours_worked !== '' ? parseFloat(rtkFields.hours_worked) : null,
-        hours_worked_closed: rtkFields.hours_worked_closed !== '' ? parseFloat(rtkFields.hours_worked_closed) : null,
-        fees_assessed: rtkFields.fees_assessed !== '' ? parseFloat(rtkFields.fees_assessed) : null,
-        fees_collected: rtkFields.fees_collected !== '' ? parseFloat(rtkFields.fees_collected) : null,
-        tax_dollar_spent: rtkFields.tax_dollar_spent !== '' ? parseFloat(rtkFields.tax_dollar_spent) : null,
-        date_records_ready: rtkFields.date_records_ready || null,
-        date_requestor_notified: rtkFields.date_requestor_notified || null,
-        appointment_datetime: rtkFields.appointment_datetime || null,
-        delivery_method: rtkFields.delivery_method || null,
-        mailed: rtkFields.mailed,
-        tracking_number: rtkFields.tracking_number || null,
-        hold_for_pickup: rtkFields.hold_for_pickup,
-      })
-      .eq('case_id', caseId)
-      .select()
+    const { error } = await supabase.from('details_91a').update({
+      acknowledged_date: rtkFields.acknowledged_date || null,
+      request_topic: rtkFields.request_topic || null,
+      number_of_records: rtkFields.number_of_records !== '' ? parseInt(rtkFields.number_of_records) : null,
+      hours_worked: rtkFields.hours_worked !== '' ? parseFloat(rtkFields.hours_worked) : null,
+      hours_worked_closed: rtkFields.hours_worked_closed !== '' ? parseFloat(rtkFields.hours_worked_closed) : null,
+      fees_assessed: rtkFields.fees_assessed !== '' ? parseFloat(rtkFields.fees_assessed) : null,
+      fees_collected: rtkFields.fees_collected !== '' ? parseFloat(rtkFields.fees_collected) : null,
+      tax_dollar_spent: rtkFields.tax_dollar_spent !== '' ? parseFloat(rtkFields.tax_dollar_spent) : null,
+      date_records_ready: rtkFields.date_records_ready || null,
+      date_requestor_notified: rtkFields.date_requestor_notified || null,
+      appointment_datetime: rtkFields.appointment_datetime || null,
+      delivery_method: rtkFields.delivery_method || null,
+      mailed: rtkFields.mailed,
+      tracking_number: rtkFields.tracking_number || null,
+      hold_for_pickup: rtkFields.hold_for_pickup,
+    }).eq('case_id', caseId).select()
 
     if (!error) {
       const changes = []
-      const oldAck = rtkData?.acknowledged_date?.slice(0, 10) || ''
-      const oldTopic = rtkData?.request_topic || ''
-      const oldRecords = rtkData?.number_of_records != null ? rtkData.number_of_records.toString() : ''
-      const oldHours = rtkData?.hours_worked != null ? rtkData.hours_worked.toString() : ''
-      const oldHoursClosed = rtkData?.hours_worked_closed != null ? rtkData.hours_worked_closed.toString() : ''
-      const oldFeeAssessed = rtkData?.fees_assessed != null ? rtkData.fees_assessed.toString() : ''
-      const oldFeeCollected = rtkData?.fees_collected != null ? rtkData.fees_collected.toString() : ''
-      const oldTaxDollar = rtkData?.tax_dollar_spent != null ? rtkData.tax_dollar_spent.toString() : ''
-      const oldDelivery = rtkData?.delivery_method || ''
-      const oldTracking = rtkData?.tracking_number || ''
-      const oldRecordsReady = rtkData?.date_records_ready?.slice(0, 10) || ''
-      const oldNotified = rtkData?.date_requestor_notified?.slice(0, 10) || ''
-      const oldAppt = rtkData?.appointment_datetime?.slice(0, 16) || ''
+      if (rtkFields.acknowledged_date !== (rtkData?.acknowledged_date?.slice(0, 10) || '')) changes.push('Acknowledged date updated')
+      if (rtkFields.request_topic !== (rtkData?.request_topic || '')) changes.push(`Request topic set to "${rtkFields.request_topic}"`)
+      if (rtkFields.number_of_records !== (rtkData?.number_of_records != null ? rtkData.number_of_records.toString() : '')) changes.push('Number of records updated')
+      if (rtkFields.hours_worked !== (rtkData?.hours_worked != null ? rtkData.hours_worked.toString() : '')) changes.push('Hours worked updated')
+      if (rtkFields.hours_worked_closed !== (rtkData?.hours_worked_closed != null ? rtkData.hours_worked_closed.toString() : '')) changes.push('Hours worked (final) updated')
+      if (rtkFields.fees_assessed !== (rtkData?.fees_assessed != null ? rtkData.fees_assessed.toString() : '')) changes.push('Fees assessed updated')
+      if (rtkFields.fees_collected !== (rtkData?.fees_collected != null ? rtkData.fees_collected.toString() : '')) changes.push('Fees collected updated')
+      if (rtkFields.tax_dollar_spent !== (rtkData?.tax_dollar_spent != null ? rtkData.tax_dollar_spent.toString() : '')) changes.push('Tax dollars spent updated')
+      if (rtkFields.delivery_method !== (rtkData?.delivery_method || '')) changes.push(`Delivery method set to "${rtkFields.delivery_method}"`)
+      if (rtkFields.tracking_number !== (rtkData?.tracking_number || '')) changes.push('Tracking number updated')
+      if (rtkFields.date_records_ready !== (rtkData?.date_records_ready?.slice(0, 10) || '')) changes.push('Date records ready updated')
+      if (rtkFields.date_requestor_notified !== (rtkData?.date_requestor_notified?.slice(0, 10) || '')) changes.push('Date requestor notified updated')
+      if (rtkFields.appointment_datetime !== (rtkData?.appointment_datetime?.slice(0, 16) || '')) changes.push('Appointment updated')
 
-      if (rtkFields.acknowledged_date !== oldAck) changes.push('Acknowledged date updated')
-      if (rtkFields.request_topic !== oldTopic) changes.push(`Request topic set to "${rtkFields.request_topic}"`)
-      if (rtkFields.number_of_records !== oldRecords) changes.push('Number of records updated')
-      if (rtkFields.hours_worked !== oldHours) changes.push('Hours worked updated')
-      if (rtkFields.hours_worked_closed !== oldHoursClosed) changes.push('Hours worked (final) updated')
-      if (rtkFields.fees_assessed !== oldFeeAssessed) changes.push('Fees assessed updated')
-      if (rtkFields.fees_collected !== oldFeeCollected) changes.push('Fees collected updated')
-      if (rtkFields.tax_dollar_spent !== oldTaxDollar) changes.push('Tax dollars spent updated')
-      if (rtkFields.date_records_ready !== oldRecordsReady) changes.push('Date records ready updated')
-      if (rtkFields.date_requestor_notified !== oldNotified) changes.push('Date requestor notified updated')
-      if (rtkFields.appointment_datetime !== oldAppt) changes.push('Appointment date/time updated')
-      if (rtkFields.delivery_method !== oldDelivery) changes.push(`Delivery method set to "${rtkFields.delivery_method}"`)
-      if (rtkFields.tracking_number !== oldTracking) changes.push('Tracking number updated')
-
-      const auditMessage = changes.length > 0
-        ? `91-A details updated: ${changes.join(', ')}`
-        : '91-A details saved (no changes)'
-
+      const auditMessage = changes.length > 0 ? `91-A details updated: ${changes.join(', ')}` : '91-A details saved (no changes)'
       await logAudit(caseId, auditMessage, userEmail)
       setRtkSuccess(true)
       await loadRtkData()
@@ -659,17 +683,23 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   async function handleAddNote() {
     if (!newNote.trim()) return
     setSavingNote(true)
-    await supabase.from('internal_notes').insert([{
-      case_id: caseId,
-      note: newNote.trim(),
-      created_by: userEmail,
-      created_at: new Date().toISOString(),
-    }])
+    await supabase.from('internal_notes').insert([{ case_id: caseId, note: newNote.trim(), created_by: userEmail, created_at: new Date().toISOString() }])
     await logAudit(caseId, `Internal note added`, userEmail)
     setNewNote('')
     await loadNotes()
     await loadAuditLog()
     setSavingNote(false)
+  }
+
+  async function handleAddComment() {
+    if (!newComment.trim()) return
+    setSavingComment(true)
+    await supabase.from('case_comments').insert([{ case_id: caseId, comment: newComment.trim(), created_by: userEmail, created_at: new Date().toISOString() }])
+    await logAudit(caseId, `Public comment added`, userEmail)
+    setNewComment('')
+    await loadComments()
+    await loadAuditLog()
+    setSavingComment(false)
   }
 
   async function handleAddDept() {
@@ -686,24 +716,18 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     await logAudit(caseId, `Assigned to ${deptName}`, userEmail)
 
     try {
-      await fetch(
-        `${SUPABASE_URL}/functions/v1/send-confirmation-email`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            type: 'department_assignment',
-            departmentId: parseInt(selectedDept),
-            caseNumber: caseData.case_number,
-            location: caseData.location,
-            description: caseData.description,
-            departmentName: deptName,
-          }),
-        }
-      )
+      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          type: 'department_assignment',
+          departmentId: parseInt(selectedDept),
+          caseNumber: caseData.case_number,
+          location: caseData.location,
+          description: caseData.description,
+          departmentName: deptName,
+        }),
+      })
     } catch (e) {
       console.error('Email notification error:', e)
     }
@@ -723,26 +747,18 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
   return (
     <div style={styles.page}>
-
       <div style={styles.topBar}>
-        <button style={styles.backBtn} onClick={onBack}>
-          ← Back to Dashboard
-        </button>
+        <button style={styles.backBtn} onClick={onBack}>← Back to Dashboard</button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-          <button style={styles.printBtn} onClick={() => onPrintWorkOrder && onPrintWorkOrder(caseId)}>
-            Print Work Order
-          </button>
-          {isAdmin && (
-            <button style={styles.exportBtn} onClick={() => onPrintCaseDetail && onPrintCaseDetail(caseId)}>
-              Export Full Case
-            </button>
-          )}
+          <button style={styles.printBtn} onClick={() => onPrintWorkOrder && onPrintWorkOrder(caseId)}>Print Work Order</button>
+          {isAdmin && <button style={styles.exportBtn} onClick={() => onPrintCaseDetail && onPrintCaseDetail(caseId)}>Export Full Case</button>}
         </div>
       </div>
 
       <div style={styles.grid}>
         <div>
 
+          {/* Case Details */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Case Details</span>
@@ -784,6 +800,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           </div>
 
+          {/* 91-A Details */}
           {caseData.is_91a && isAdmin && (
             <div style={styles.card}>
               <div style={{ ...styles.cardHeader, ...styles.rtkHeader }}>
@@ -792,102 +809,79 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
               </div>
               <div style={styles.cardBody}>
                 {rtkSuccess && <div style={styles.successMsg}>91-A details saved successfully.</div>}
-
                 <div style={styles.sectionDivider}>Request Info</div>
                 <div style={styles.twoCol}>
                   <div>
                     <div style={styles.fieldLabel}>Acknowledged Date</div>
-                    <input type="date" style={styles.input} value={rtkFields.acknowledged_date}
-                      onChange={e => setRtkFields(prev => ({ ...prev, acknowledged_date: e.target.value }))} />
+                    <input type="date" style={styles.input} value={rtkFields.acknowledged_date} onChange={e => setRtkFields(prev => ({ ...prev, acknowledged_date: e.target.value }))} />
                   </div>
                   <div>
                     <div style={styles.fieldLabel}>Request Topic</div>
-                    <select style={styles.select} value={rtkFields.request_topic}
-                      onChange={e => setRtkFields(prev => ({ ...prev, request_topic: e.target.value }))}>
+                    <select style={styles.select} value={rtkFields.request_topic} onChange={e => setRtkFields(prev => ({ ...prev, request_topic: e.target.value }))}>
                       <option value="">-- Select topic --</option>
-                      {requestTopics.map(t => (
-                        <option key={t.id} value={t.name}>{t.name}</option>
-                      ))}
+                      {requestTopics.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                     </select>
                   </div>
                 </div>
-
                 <div style={styles.sectionDivider}>Records &amp; Hours</div>
                 <div style={styles.twoCol}>
                   <div>
                     <div style={styles.fieldLabel}>Number of Records</div>
-                    <input type="number" style={styles.input} placeholder="0" value={rtkFields.number_of_records}
-                      onChange={e => setRtkFields(prev => ({ ...prev, number_of_records: e.target.value }))} />
+                    <input type="number" style={styles.input} placeholder="0" value={rtkFields.number_of_records} onChange={e => setRtkFields(prev => ({ ...prev, number_of_records: e.target.value }))} />
                   </div>
                   <div>
                     <div style={styles.fieldLabel}>Hours Worked (Running)</div>
-                    <input type="number" step="0.5" style={styles.input} placeholder="0.0" value={rtkFields.hours_worked}
-                      onChange={e => setRtkFields(prev => ({ ...prev, hours_worked: e.target.value }))} />
+                    <input type="number" step="0.5" style={styles.input} placeholder="0.0" value={rtkFields.hours_worked} onChange={e => setRtkFields(prev => ({ ...prev, hours_worked: e.target.value }))} />
                   </div>
                 </div>
                 <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
                   <div style={styles.fieldLabel}>Hours Worked (Final at Close)</div>
-                  <input type="number" step="0.5" style={styles.input} placeholder="0.0" value={rtkFields.hours_worked_closed}
-                    onChange={e => setRtkFields(prev => ({ ...prev, hours_worked_closed: e.target.value }))} />
+                  <input type="number" step="0.5" style={styles.input} placeholder="0.0" value={rtkFields.hours_worked_closed} onChange={e => setRtkFields(prev => ({ ...prev, hours_worked_closed: e.target.value }))} />
                 </div>
-
                 <div style={styles.sectionDivider}>Fees</div>
                 <div style={styles.twoCol}>
                   <div>
                     <div style={styles.fieldLabel}>Fees Assessed ($)</div>
-                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_assessed}
-                      onChange={e => setRtkFields(prev => ({ ...prev, fees_assessed: e.target.value }))} />
+                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_assessed} onChange={e => setRtkFields(prev => ({ ...prev, fees_assessed: e.target.value }))} />
                   </div>
                   <div>
                     <div style={styles.fieldLabel}>Fees Collected ($)</div>
-                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_collected}
-                      onChange={e => setRtkFields(prev => ({ ...prev, fees_collected: e.target.value }))} />
+                    <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.fees_collected} onChange={e => setRtkFields(prev => ({ ...prev, fees_collected: e.target.value }))} />
                   </div>
                 </div>
                 <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
                   <div style={styles.fieldLabel}>Tax Dollars Spent ($)</div>
                   <div style={styles.inputHint}>Total cost to the city for fulfilling this request</div>
-                  <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.tax_dollar_spent}
-                    onChange={e => setRtkFields(prev => ({ ...prev, tax_dollar_spent: e.target.value }))} />
+                  <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.tax_dollar_spent} onChange={e => setRtkFields(prev => ({ ...prev, tax_dollar_spent: e.target.value }))} />
                 </div>
-
                 <div style={styles.sectionDivider}>Fulfillment</div>
                 <div style={styles.twoCol}>
                   <div>
                     <div style={styles.fieldLabel}>Date Records Ready</div>
-                    <input type="date" style={styles.input} value={rtkFields.date_records_ready}
-                      onChange={e => setRtkFields(prev => ({ ...prev, date_records_ready: e.target.value }))} />
+                    <input type="date" style={styles.input} value={rtkFields.date_records_ready} onChange={e => setRtkFields(prev => ({ ...prev, date_records_ready: e.target.value }))} />
                   </div>
                   <div>
                     <div style={styles.fieldLabel}>Date Requestor Notified</div>
-                    <input type="date" style={styles.input} value={rtkFields.date_requestor_notified}
-                      onChange={e => setRtkFields(prev => ({ ...prev, date_requestor_notified: e.target.value }))} />
+                    <input type="date" style={styles.input} value={rtkFields.date_requestor_notified} onChange={e => setRtkFields(prev => ({ ...prev, date_requestor_notified: e.target.value }))} />
                   </div>
                 </div>
-
                 <div style={styles.fieldLabel}>Delivery Method</div>
-                <select style={styles.select} value={rtkFields.delivery_method}
-                  onChange={e => setRtkFields(prev => ({ ...prev, delivery_method: e.target.value, mailed: e.target.value === 'Mailed', hold_for_pickup: e.target.value === 'Hold for Pick Up' }))}>
+                <select style={styles.select} value={rtkFields.delivery_method} onChange={e => setRtkFields(prev => ({ ...prev, delivery_method: e.target.value, mailed: e.target.value === 'Mailed', hold_for_pickup: e.target.value === 'Hold for Pick Up' }))}>
                   <option value="">-- Select delivery method --</option>
                   {DELIVERY_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-
                 {showAppointment && (
                   <>
                     <div style={styles.fieldLabel}>Appointment Date &amp; Time</div>
-                    <input type="datetime-local" style={styles.input} value={rtkFields.appointment_datetime}
-                      onChange={e => setRtkFields(prev => ({ ...prev, appointment_datetime: e.target.value }))} />
+                    <input type="datetime-local" style={styles.input} value={rtkFields.appointment_datetime} onChange={e => setRtkFields(prev => ({ ...prev, appointment_datetime: e.target.value }))} />
                   </>
                 )}
-
                 {rtkFields.delivery_method === 'Mailed' && (
                   <>
                     <div style={styles.fieldLabel}>Tracking Number</div>
-                    <input type="text" style={styles.input} placeholder="Enter tracking number" value={rtkFields.tracking_number}
-                      onChange={e => setRtkFields(prev => ({ ...prev, tracking_number: e.target.value }))} />
+                    <input type="text" style={styles.input} placeholder="Enter tracking number" value={rtkFields.tracking_number} onChange={e => setRtkFields(prev => ({ ...prev, tracking_number: e.target.value }))} />
                   </>
                 )}
-
                 <button style={savingRtk ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveRtk} disabled={savingRtk}>
                   {savingRtk ? 'Saving...' : 'Save 91-A Details'}
                 </button>
@@ -895,6 +889,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           )}
 
+          {/* Submitter Info — editable for admin */}
           {isAdmin && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
@@ -902,25 +897,68 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>Internal only</span>
               </div>
               <div style={styles.cardBody}>
-                <div style={styles.submitterInfo}>
-                  <div><strong>Name:</strong> {caseData.submitter_name || 'Anonymous'}</div>
-                  <div><strong>Email:</strong> {caseData.submitter_email || '—'}</div>
-                  <div><strong>Phone:</strong> {caseData.submitter_phone || '—'}</div>
-                  {caseData.requestor_id && (
-                    <div><strong>Requestor ID:</strong> {caseData.requestor_id}</div>
-                  )}
+                {submitterSuccess && <div style={styles.successMsg}>Submitter info updated.</div>}
+                <div style={styles.twoCol}>
+                  <div>
+                    <div style={styles.fieldLabel}>Name</div>
+                    <input type="text" style={styles.input} value={submitterName} onChange={e => setSubmitterName(e.target.value)} placeholder="Full name" />
+                  </div>
+                  <div>
+                    <div style={styles.fieldLabel}>Email</div>
+                    <input type="email" style={styles.input} value={submitterEmail} onChange={e => setSubmitterEmail(e.target.value)} placeholder="email@example.com" />
+                  </div>
                 </div>
+                <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
+                  <div style={styles.fieldLabel}>Phone</div>
+                  <input type="tel" style={styles.input} value={submitterPhone} onChange={e => setSubmitterPhone(e.target.value)} placeholder="(603) 000-0000" />
+                </div>
+                {caseData.requestor_id && (
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
+                    <strong>Requestor ID:</strong> {caseData.requestor_id}
+                  </div>
+                )}
+                <button style={savingSubmitter ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveSubmitter} disabled={savingSubmitter}>
+                  {savingSubmitter ? 'Saving...' : 'Save Submitter Info'}
+                </button>
               </div>
             </div>
           )}
 
+          {/* Public Comments */}
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <span style={styles.cardTitle}>Public Updates</span>
+              <span style={styles.publicBadge}>Visible to public</span>
+            </div>
+            <div style={styles.cardBody}>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+                Comments added here are visible to the public on the case tracker. Use for status updates you want the requestor to see.
+              </div>
+              <textarea style={styles.textarea} placeholder="Add a public update..." value={newComment} onChange={e => setNewComment(e.target.value)} />
+              <button style={savingComment ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleAddComment} disabled={savingComment}>
+                {savingComment ? 'Saving...' : 'Post Public Update'}
+              </button>
+              {comments.length === 0 ? (
+                <div style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic', marginTop: '8px' }}>No public updates yet.</div>
+              ) : (
+                comments.map(c => (
+                  <div key={c.id} style={styles.commentBox}>
+                    <div style={styles.noteMeta}>{c.created_by} · {formatDateTime(c.created_at)}</div>
+                    <div style={styles.noteText}>{c.comment}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Internal Notes */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Internal Notes</span>
+              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Staff only</span>
             </div>
             <div style={styles.cardBody}>
-              <textarea style={styles.textarea} placeholder="Add an internal note..." value={newNote}
-                onChange={e => setNewNote(e.target.value)} />
+              <textarea style={styles.textarea} placeholder="Add an internal note..." value={newNote} onChange={e => setNewNote(e.target.value)} />
               <button style={savingNote ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleAddNote} disabled={savingNote}>
                 {savingNote ? 'Saving...' : 'Add Note'}
               </button>
@@ -937,6 +975,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           </div>
 
+          {/* Audit Log */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Activity Log</span>
@@ -962,8 +1001,10 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
         </div>
 
+        {/* Right sidebar */}
         <div>
 
+          {/* Admin update panel */}
           {isAdmin && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
@@ -971,37 +1012,23 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
               </div>
               <div style={styles.cardBody}>
                 {saveSuccess && <div style={styles.successMsg}>Case updated successfully.</div>}
-
                 <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Status</div>
                 <select style={styles.select} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
                   <option value="">-- Select status --</option>
-                  {adminStatuses.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{s.is_91a_only ? ' (91-A)' : ''}
-                    </option>
-                  ))}
+                  {adminStatuses.map(s => <option key={s.id} value={s.id}>{s.name}{s.is_91a_only ? ' (91-A)' : ''}</option>)}
                 </select>
-
                 <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Issue Type</div>
                 <select style={styles.select} value={selectedIssueType} onChange={e => setSelectedIssueType(e.target.value)}>
                   <option value="">-- Select issue type --</option>
                   {issueTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-
                 <div style={{ ...styles.fieldLabel, marginBottom: '4px', marginTop: '8px' }}>Follow-up Due Date</div>
                 <div style={styles.inputHint}>Clear this date to remove from follow-up tracking</div>
                 <input type="date" style={styles.input} value={followupDate} onChange={e => setFollowupDate(e.target.value)} />
-
                 <div style={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={is91a}
-                    onChange={e => setIs91a(e.target.checked)}
-                    style={{ accentColor: '#1a56a0', width: '15px', height: '15px' }}
-                  />
+                  <input type="checkbox" checked={is91a} onChange={e => setIs91a(e.target.checked)} style={{ accentColor: '#1a56a0', width: '15px', height: '15px' }} />
                   <span>This is a 91-A Right-to-Know request</span>
                 </div>
-
                 <button style={saving ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveCase} disabled={saving}>
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -1009,6 +1036,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             </div>
           )}
 
+          {/* Dept user status panel */}
           {!isAdmin && myDeptAssignment && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
@@ -1017,24 +1045,20 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
               <div style={styles.cardBody}>
                 {deptSaveSuccess && <div style={styles.successMsg}>Status updated successfully.</div>}
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
-                  Update your department's status for this case. This does not affect the overall case status.
+                  Update your department's status. This does not affect the overall case status.
                 </div>
-                <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Your Department's Status</div>
                 <select style={styles.select} value={deptSelectedStatus} onChange={e => setDeptSelectedStatus(e.target.value)}>
                   <option value="">-- Select status --</option>
                   {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                <button
-                  style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn}
-                  onClick={handleSaveDeptStatus}
-                  disabled={savingDeptStatus}
-                >
+                <button style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveDeptStatus} disabled={savingDeptStatus}>
                   {savingDeptStatus ? 'Saving...' : 'Update My Status'}
                 </button>
               </div>
             </div>
           )}
 
+          {/* Departments panel */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Assigned Departments</span>
@@ -1043,10 +1067,30 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
               {caseData.case_departments?.length === 0 ? (
                 <div style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic', marginBottom: '12px' }}>No departments assigned.</div>
               ) : (
-                caseData.case_departments?.map((cd, i) => (
-                  <div key={i} style={styles.deptRow}>
+                caseData.case_departments?.map((cd) => (
+                  <div key={cd.id} style={{ ...styles.deptRow, flexDirection: isAdmin ? 'column' : 'row', alignItems: isAdmin ? 'flex-start' : 'center' }}>
                     <span style={styles.deptName}>{cd.departments?.name}</span>
-                    <span style={styles.deptStatus}>{cd.statuses?.name}</span>
+                    {isAdmin ? (
+                      <div style={{ display: 'flex', gap: '6px', width: '100%', marginTop: '4px' }}>
+                        <select
+                          style={{ ...styles.select, marginBottom: 0, flex: 1, fontSize: '12px', padding: '5px 8px' }}
+                          value={deptStatusEdits[cd.id] || ''}
+                          onChange={e => setDeptStatusEdits(prev => ({ ...prev, [cd.id]: e.target.value }))}
+                        >
+                          <option value="">-- Status --</option>
+                          {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                        <button
+                          style={{ padding: '5px 10px', backgroundColor: savingDeptId === cd.id ? '#93afd4' : '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          onClick={() => handleSaveDeptStatusAdmin(cd.id, cd.departments?.name)}
+                          disabled={savingDeptId === cd.id}
+                        >
+                          {savingDeptId === cd.id ? '...' : 'Save'}
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={styles.deptStatus}>{cd.statuses?.name}</span>
+                    )}
                   </div>
                 ))
               )}

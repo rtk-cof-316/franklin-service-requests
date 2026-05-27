@@ -145,35 +145,84 @@ const styles = {
     fontWeight: '600',
     marginTop: '4px',
   },
+  commentsSection: {
+    marginTop: '20px',
+    borderTop: '2px solid #e5e7eb',
+    paddingTop: '20px',
+  },
+  commentsSectionTitle: {
+    fontSize: '13px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    color: '#6b7280',
+    marginBottom: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  commentItem: {
+    display: 'flex',
+    gap: '12px',
+    marginBottom: '14px',
+    alignItems: 'flex-start',
+  },
+  commentDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    backgroundColor: '#1a56a0',
+    marginTop: '4px',
+    flexShrink: 0,
+  },
+  commentContent: {
+    flex: 1,
+    backgroundColor: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    borderRadius: '6px',
+    padding: '10px 14px',
+  },
+  commentMeta: {
+    fontSize: '11px',
+    color: '#6b7280',
+    marginBottom: '4px',
+  },
+  commentText: {
+    fontSize: '14px',
+    color: '#1e3a5f',
+    lineHeight: '1.6',
+  },
+  noComments: {
+    fontSize: '13px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
 }
 
 function getStatusStyle(statusName) {
   const s = (statusName || '').toLowerCase()
-  if (s === 'resolved' || s === 'closed') {
-    return { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46' }
-  }
-  if (s === 'in progress' || s === 'assigned' || s === 'scheduled') {
-    return { ...styles.statusBadge, backgroundColor: '#dbeafe', color: '#1e40af' }
-  }
-  if (s === 'lacks resources to resolve' || s === 'unfounded') {
-    return { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b' }
-  }
+  if (s === 'resolved' || s === 'closed') return { ...styles.statusBadge, backgroundColor: '#d1fae5', color: '#065f46' }
+  if (['in progress','assigned','scheduled','gathering records','reviewing records'].includes(s)) return { ...styles.statusBadge, backgroundColor: '#dbeafe', color: '#1e40af' }
+  if (['lacks resources to resolve','unfounded','request abandoned'].includes(s)) return { ...styles.statusBadge, backgroundColor: '#fee2e2', color: '#991b1b' }
+  if (['clarification needed','records ready - please schedule pick up'].includes(s)) return { ...styles.statusBadge, backgroundColor: '#fef3c7', color: '#92400e' }
   return { ...styles.statusBadge, backgroundColor: '#f3f4f6', color: '#374151' }
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+function formatDateTime(dateStr) {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 function CaseTracker() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [comments, setComments] = useState([])
   const [searched, setSearched] = useState(false)
 
   async function handleSearch() {
@@ -181,10 +230,12 @@ function CaseTracker() {
     setLoading(true)
     setSearched(true)
     setResult(null)
+    setComments([])
 
     const { data, error } = await supabase
       .from('cases')
       .select(`
+        id,
         case_number,
         date_submitted,
         location,
@@ -200,6 +251,13 @@ function CaseTracker() {
       setResult(null)
     } else {
       setResult(data)
+      // Load public comments for this case
+      const { data: commentData } = await supabase
+        .from('case_comments')
+        .select('*')
+        .eq('case_id', data.id)
+        .order('created_at', { ascending: true })
+      setComments(commentData || [])
     }
     setLoading(false)
   }
@@ -287,6 +345,29 @@ function CaseTracker() {
                     </div>
                   </>
                 )}
+
+                {/* Public comments / updates */}
+                <div style={styles.commentsSection}>
+                  <div style={styles.commentsSectionTitle}>
+                    📣 City Updates
+                  </div>
+                  {comments.length === 0 ? (
+                    <div style={styles.noComments}>No updates from the city yet.</div>
+                  ) : (
+                    comments.map(c => (
+                      <div key={c.id} style={styles.commentItem}>
+                        <div style={styles.commentDot} />
+                        <div style={styles.commentContent}>
+                          <div style={styles.commentMeta}>
+                            City of Franklin · {formatDateTime(c.created_at)}
+                          </div>
+                          <div style={styles.commentText}>{c.comment}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
               </div>
             </div>
           )}
