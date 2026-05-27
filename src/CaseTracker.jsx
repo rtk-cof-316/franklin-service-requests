@@ -225,6 +225,7 @@ function CaseTracker() {
   const [result, setResult] = useState(null)
   const [comments, setComments] = useState([])
   const [searched, setSearched] = useState(false)
+  const [auditLog, setAuditLog] = useState([])
 
   async function handleSearch() {
     if (!query.trim()) return
@@ -259,6 +260,14 @@ function CaseTracker() {
         .eq('case_id', data.id)
         .order('created_at', { ascending: true })
       setComments(commentData || [])
+
+      const { data: auditData } = await supabase
+        .from('case_audit_log')
+        .select('*')
+        .eq('case_id', data.id)
+        .not('action', 'ilike', '%internal note%')
+        .order('created_at', { ascending: true })
+      setAuditLog(auditData || [])
     }
     setLoading(false)
   }
@@ -367,6 +376,22 @@ function CaseTracker() {
                       </div>
                     ))
                   )}
+                  {auditLog.length > 0 && (
+  <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
+    <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
+      📋 Case Activity
+    </div>
+    {auditLog.map(entry => (
+      <div key={entry.id} style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-start' }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#9ca3af', marginTop: '5px', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.4' }}>{entry.action}</div>
+          <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{formatDateTime(entry.created_at)}</div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
                   {/* Attachments */}
 <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
   <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
