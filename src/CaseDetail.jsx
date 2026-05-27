@@ -1128,8 +1128,10 @@ async function handleSaveDeptStatus() {
                 <div style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic', marginBottom: '12px' }}>No departments assigned.</div>
               ) : (
                 caseData.case_departments?.map((cd) => (
-                  <div key={cd.id} style={{ ...styles.deptRow, flexDirection: isAdmin ? 'column' : 'row', alignItems: isAdmin ? 'flex-start' : 'center' }}>
-                    <span style={styles.deptName}>{cd.departments?.name}</span>
+                  <div key={cd.id} style={{ ...styles.deptRow, flexDirection: 'column', alignItems: 'stretch' }}>
+                    <div style={{ backgroundColor: '#f3f4f6', padding: '6px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '4px' }}>
+  {cd.departments?.name}
+</div>
                     {isAdmin ? (
                       <div style={{ display: 'flex', gap: '6px', width: '100%', marginTop: '4px' }}>
                         <select
