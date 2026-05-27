@@ -32,39 +32,45 @@ function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session) loadUserProfile(session.user.id, _event === 'SIGNED_IN')
-else { setUserRole(null); setUserDepartmentId(null) }
+      if (session) {
+        // Only redirect to dashboard on actual sign in, not on token refresh or tab focus
+        loadUserProfile(session.user.id, _event === 'SIGNED_IN')
+      } else {
+        setUserRole(null)
+        setUserDepartmentId(null)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
+
   // Auto logout after 5 minutes of inactivity
-useEffect(() => {
-  if (!session) return
+  useEffect(() => {
+    if (!session) return
 
-  let timer
+    let timer
 
-  function resetTimer() {
-    clearTimeout(timer)
-    timer = setTimeout(async () => {
-      await supabase.auth.signOut()
-      setPage('submit')
-      setUserRole(null)
-      setUserDepartmentId(null)
-      setViewingCaseId(null)
-    }, 5 * 60 * 1000) // 5 minutes
-  }
+    function resetTimer() {
+      clearTimeout(timer)
+      timer = setTimeout(async () => {
+        await supabase.auth.signOut()
+        setPage('submit')
+        setUserRole(null)
+        setUserDepartmentId(null)
+        setViewingCaseId(null)
+      }, 5 * 60 * 1000)
+    }
 
-  const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
-  events.forEach(e => window.addEventListener(e, resetTimer))
-  resetTimer()
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.addEventListener(e, resetTimer))
+    resetTimer()
 
-  return () => {
-    clearTimeout(timer)
-    events.forEach(e => window.removeEventListener(e, resetTimer))
-  }
-}, [session])
+    return () => {
+      clearTimeout(timer)
+      events.forEach(e => window.removeEventListener(e, resetTimer))
+    }
+  }, [session])
 
-async function loadUserProfile(userId, redirect = false) {
+  async function loadUserProfile(userId, shouldRedirect = false) {
     const { data } = await supabase
       .from('user_profiles')
       .select('role, department_id')
@@ -73,9 +79,15 @@ async function loadUserProfile(userId, redirect = false) {
     if (data) {
       setUserRole(data.role)
       setUserDepartmentId(data.department_id)
-      if (redirect) {
-        if (data.role === 'admin') setPage('admin')
-        else if (data.role === 'department') setPage('department')
+      // Only redirect to dashboard if explicitly told to AND user is on login page or submit page
+      if (shouldRedirect) {
+        setPage(prev => {
+          if (prev === 'login' || prev === 'submit' || prev === 'track' || prev === 'roads' || prev === 'analytics') {
+            if (data.role === 'admin') return 'admin'
+            if (data.role === 'department') return 'department'
+          }
+          return prev
+        })
       }
     }
   }
