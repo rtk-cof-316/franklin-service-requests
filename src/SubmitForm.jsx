@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import CaseFiles from './CaseFiles'
 
 const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -251,6 +252,7 @@ function SubmitForm() {
   })
   const [submitted, setSubmitted] = useState(false)
   const [caseNumber, setCaseNumber] = useState('')
+  const [newCaseId, setNewCaseId] = useState(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -381,6 +383,7 @@ function SubmitForm() {
       }
     }
 
+    setNewCaseId(newCase.id)
     setCaseNumber(newCaseNumber)
     setSubmitted(true)
     setLoading(false)
@@ -410,6 +413,21 @@ function SubmitForm() {
             <p style={styles.successText}>
               A confirmation email will be sent if you provided an email address.
             </p>
+            <div style={{ marginTop: '20px', textAlign: 'left', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
+  <div style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
+    📎 Attach Photos or Files (Optional)
+  </div>
+  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+    You can attach photos or documents to help describe your request.
+  </div>
+  {newCaseId && (
+    <CaseFiles
+      caseId={newCaseId}
+      canUpload={true}
+      uploadedBy="Public Submitter"
+    />
+  )}
+</div>
           </div>
         </div>
       </div>

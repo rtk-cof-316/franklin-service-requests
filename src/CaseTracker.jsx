@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
+import CaseFiles from './CaseFiles'
 
 const styles = {
   page: {
@@ -366,6 +367,16 @@ function CaseTracker() {
                       </div>
                     ))
                   )}
+                  {/* Attachments */}
+<div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
+  <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
+    📎 Attachments
+  </div>
+  <CaseFiles
+    caseId={result.id}
+    canUpload={false}
+  />
+</div>
                 </div>
 
               </div>

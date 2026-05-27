@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import CaseFiles from './CaseFiles'
 
 const styles = {
   page: {
@@ -974,7 +975,20 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
               )}
             </div>
           </div>
-
+          {/* Attachments */}
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <span style={styles.cardTitle}>Attachments</span>
+              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Visible to public</span>
+            </div>
+            <div style={styles.cardBody}>
+              <CaseFiles
+                caseId={caseId}
+                canUpload={true}
+                uploadedBy={userEmail}
+              />
+            </div>
+          </div>
           {/* Audit Log */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
