@@ -28,12 +28,12 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) loadUserProfile(session.user.id)
+      if (session) loadUserProfile(session.user.id, true)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session) loadUserProfile(session.user.id)
-      else { setUserRole(null); setUserDepartmentId(null) }
+      if (session) loadUserProfile(session.user.id, _event === 'SIGNED_IN')
+else { setUserRole(null); setUserDepartmentId(null) }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -64,7 +64,7 @@ useEffect(() => {
   }
 }, [session])
 
-  async function loadUserProfile(userId) {
+async function loadUserProfile(userId, redirect = false) {
     const { data } = await supabase
       .from('user_profiles')
       .select('role, department_id')
@@ -73,8 +73,10 @@ useEffect(() => {
     if (data) {
       setUserRole(data.role)
       setUserDepartmentId(data.department_id)
-      if (data.role === 'admin') setPage('admin')
-      else if (data.role === 'department') setPage('department')
+      if (redirect) {
+        if (data.role === 'admin') setPage('admin')
+        else if (data.role === 'department') setPage('department')
+      }
     }
   }
 
