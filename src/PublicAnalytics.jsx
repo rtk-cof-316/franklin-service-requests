@@ -99,6 +99,7 @@ function PublicAnalytics() {
   const [loading, setLoading] = useState(true)
   const [rtkSearch, setRtkSearch] = useState('')
   const [rtkStatusFilter, setRtkStatusFilter] = useState('all')
+  const totalTaxDollars = rtkDetails.reduce((sum, d) => sum + (parseFloat(d.tax_dollar_spent) || 0), 0)
 
   useEffect(() => {
     loadAll()
@@ -239,7 +240,7 @@ function PublicAnalytics() {
   const inProgress = cases.length - resolved - lacksResources - unfounded
   const total = cases.length || 1
   const outcomeSegments = [
-    { label: 'Resolved / Closed', count: resolved, color: '#16a34a', pct: Math.round((resolved/total)*100) },
+    { label: 'Closed', count: resolved, color: '#16a34a', pct: Math.round((resolved/total)*100) },
     { label: 'In Progress', count: inProgress, color: '#1a56a0', pct: Math.round((inProgress/total)*100) },
     { label: 'Lacks Resources to Resolve', count: lacksResources, color: '#dc2626', pct: Math.round((lacksResources/total)*100) },
     { label: 'Unfounded', count: unfounded, color: '#d97706', pct: Math.round((unfounded/total)*100) },
@@ -316,12 +317,13 @@ function PublicAnalytics() {
         </div>
 
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
-          <ScoreCard value={formatNum(total91a)} label="Total 91-A Requests" color="#1a56a0" />
-          <ScoreCard value={formatNum(totalDocsReleased)} label="Documents Released" color="#16a34a" />
-          <ScoreCard value={onTimeRate} label="Acknowledged On Time" sub="Within 5 business days" color="#d97706" />
-          <ScoreCard value={formatHours(totalHours)} label="Total Staff Hours" color="#7c3aed" />
-          <ScoreCard value={formatMoney(totalFees)} label="Fees Collected" color="#0891b2" />
-        </div>
+  <ScoreCard value={formatNum(total91a)} label="Total 91-A Requests" color="#1a56a0" />
+  <ScoreCard value={onTimeRate} label="Acknowledged On Time" sub="Within 5 business days" color="#d97706" />
+  <ScoreCard value={formatHours(totalHours)} label="Total Staff Hours" color="#7c3aed" />
+  <ScoreCard value={formatMoney(totalTaxDollars)} label="Tax Dollars Spent" sub="Staff time & resources" color="#dc2626" />
+  <ScoreCard value={formatMoney(totalFees)} label="Fees Collected" color="#16a34a" />
+  <ScoreCard value={formatNum(totalDocsReleased)} label="Documents Requested" color="#16a34a" />
+</div>
 
         <SectionCard
           title="📁 Requests by Topic"
@@ -340,7 +342,6 @@ function PublicAnalytics() {
         {/* 91-A Status Key */}
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '16px' }}>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>🔑 Status Guide</div>
-          <div style={{ fontSize: '14px', color: '#4b5563', marginBottom: '16px', lineHeight: '1.6' }}>Not sure what a status means? Here's a plain-language explanation of each one.</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             {[
               { status: 'Closed', color: '#065f46', bg: '#d1fae5', desc: 'The request has been fulfilled and records have been released.' },
