@@ -679,12 +679,41 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setAddingDept(true)
     const defaultStatus = allStatuses.find(s => s.name === 'Received')
     const deptName = departments.find(d => d.id === parseInt(selectedDept))?.name
+
     await supabase.from('case_departments').insert([{
       case_id: caseId,
       department_id: parseInt(selectedDept),
       status_id: defaultStatus?.id || allStatuses[0]?.id,
     }])
     await logAudit(caseId, `Assigned to ${deptName}`, userEmail)
+
+    // Get all users in this department and their emails
+try {
+  console.log('Sending dept notification for dept:', parseInt(selectedDept))
+  const response = await fetch(
+    'https://sdibtkmmcegthmytmzvy.supabase.co/functions/v1/send-confirmation-email',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        type: 'department_assignment',
+        departmentId: parseInt(selectedDept),
+        caseNumber: caseData.case_number,
+        location: caseData.location,
+        description: caseData.description,
+        departmentName: deptName,
+      }),
+    }
+  )
+  const result = await response.json()
+  console.log('Email function response:', result)
+} catch (e) {
+  console.error('Email notification error:', e)
+}
+    
     setSelectedDept('')
     await loadCase()
     await loadAuditLog()
