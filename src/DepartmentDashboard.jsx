@@ -279,6 +279,13 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
 
+  // Password change state
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordMsg, setPasswordMsg] = useState(null)
+  const [savingPassword, setSavingPassword] = useState(false)
+
   useEffect(() => {
     loadDepartmentName()
     loadCases()
@@ -300,7 +307,6 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   async function loadCases() {
     setLoading(true)
 
-    // Get this dept's assignments including their dept-specific status
     const { data: caseDepts } = await supabase
       .from('case_departments')
       .select('case_id, statuses ( name )')
@@ -314,7 +320,6 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
     const caseIds = caseDepts.map(cd => cd.case_id)
 
-    // Build a lookup of case_id -> dept status
     const deptStatusMap = {}
     caseDepts.forEach(cd => {
       deptStatusMap[cd.case_id] = cd.statuses?.name || null
@@ -337,7 +342,6 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
       .order('date_submitted', { ascending: false })
 
     if (!error) {
-      // Attach the dept-specific status to each case
       const enriched = (data || []).map(c => ({
         ...c,
         dept_status: deptStatusMap[c.id] || null,
@@ -347,13 +351,33 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     setLoading(false)
   }
 
+  async function handleChangePassword() {
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordMsg({ type: 'error', text: 'Password must be at least 6 characters.' })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ type: 'error', text: 'Passwords do not match.' })
+      return
+    }
+    setSavingPassword(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) {
+      setPasswordMsg({ type: 'error', text: error.message })
+    } else {
+      setPasswordMsg({ type: 'success', text: 'Password updated successfully!' })
+      setNewPassword('')
+      setConfirmPassword('')
+      setShowPasswordForm(false)
+    }
+    setSavingPassword(false)
+  }
+
   const filteredCases = cases.filter(c => {
     const deptStatus = (c.dept_status || '').toLowerCase()
     const isOpen = !closedStatuses.includes(deptStatus)
-
     if (statusFilter === 'open' && !isOpen) return false
     if (statusFilter === 'closed' && isOpen) return false
-
     if (search.trim()) {
       const s = search.toLowerCase()
       return (
@@ -373,7 +397,6 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   const upcomingFollowups = cases.filter(c => {
     if (!c.followup_due_date) return false
     const days = daysUntil(c.followup_due_date)
-    // Only show follow-ups for open cases
     const deptStatus = (c.dept_status || '').toLowerCase()
     const isOpen = !closedStatuses.includes(deptStatus)
     return isOpen && days !== null && days >= -999 && days <= 10
@@ -527,6 +550,51 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
           </table>
         )}
       </div>
+
+      {/* Password change */}
+      {/* Password change */}
+<div style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <span style={{ fontSize: '13px', color: '#6b7280' }}>Need to update your login credentials?</span>
+  <button
+    onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMsg(null) }}
+    style={{ padding: '6px 14px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#374151', fontSize: '13px', fontWeight: '600', borderRadius: '6px', cursor: 'pointer' }}
+  >
+    Change My Password
+  </button>
+</div>
+
+      {showPasswordForm && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginTop: '8px', maxWidth: '400px', marginLeft: 'auto' }}>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>Change Password</div>
+          {passwordMsg && (
+            <div style={{ fontSize: '13px', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', backgroundColor: passwordMsg.type === 'error' ? '#fee2e2' : '#d1fae5', color: passwordMsg.type === 'error' ? '#991b1b' : '#065f46' }}>
+              {passwordMsg.text}
+            </div>
+          )}
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box', outline: 'none' }}
+          />
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box', outline: 'none' }}
+          />
+          <button
+            onClick={handleChangePassword}
+            disabled={savingPassword}
+            style={{ padding: '8px 20px', backgroundColor: savingPassword ? '#93afd4' : '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: savingPassword ? 'not-allowed' : 'pointer' }}
+          >
+            {savingPassword ? 'Saving...' : 'Update Password'}
+          </button>
+        </div>
+      )}
+
     </div>
   )
 }

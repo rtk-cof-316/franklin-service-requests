@@ -327,6 +327,29 @@ function SubmitForm() {
       return
     }
 
+
+// Geocode road issue types automatically
+const roadIssueTypes = ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding']
+const selectedIssueType = issueTypes.find(t => t.id === parseInt(formData.issue_type_id))
+if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && formData.location && newCase) {
+  try {
+    const geoQuery = `${formData.location}, Franklin, NH 03235`
+    const geoRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geoQuery)}&limit=1&countrycodes=us`,
+      { headers: { 'User-Agent': 'CityOfFranklinNH-ServiceRequests/1.0' } }
+    )
+    const geoData = await geoRes.json()
+    if (geoData && geoData.length > 0) {
+      await supabase.from('cases').update({
+        latitude: parseFloat(geoData[0].lat),
+        longitude: parseFloat(geoData[0].lon),
+      }).eq('id', newCase.id)
+    }
+  } catch (geoError) {
+    console.error('Geocoding error:', geoError)
+  }
+}
+
     if (formData.is_91a && newCase) {
   await supabase.from('details_91a').insert([{ case_id: newCase.id }])
 
@@ -555,6 +578,7 @@ function SubmitForm() {
             <span style={styles.labelHint}>
               This information will be visible on the public case tracker.
             </span>
+            
             <textarea
               name="description"
               value={formData.description}
@@ -568,7 +592,9 @@ function SubmitForm() {
               }
             />
           </div>
-
+<div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '13px', color: '#1e40af', lineHeight: '1.6' }}>
+  📎 <strong>Want to attach a photo or file?</strong> After submitting you'll have the option to upload photos or documents to support your request.
+</div>
           <button
             onClick={handleSubmit}
             disabled={loading}

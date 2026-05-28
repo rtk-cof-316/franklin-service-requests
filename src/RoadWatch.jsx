@@ -81,6 +81,8 @@ function RoadWatch() {
         closed_date,
         location,
         description,
+        latitude,
+        longitude,
         statuses ( name ),
         issue_types ( name )
       `)
@@ -220,10 +222,10 @@ function RoadWatch() {
               />
               {filteredCases.map(c => (
                 <Marker
-                  key={c.id}
-                  position={FRANKLIN_CENTER}
-                  icon={createColoredIcon(getMarkerColor(c.statuses?.name))}
-                >
+  key={c.id}
+  position={c.latitude && c.longitude ? [c.latitude, c.longitude] : FRANKLIN_CENTER}
+  icon={createColoredIcon(getMarkerColor(c.statuses?.name))}
+>
                   <Popup>
                     <div style={{ fontSize: '13px', minWidth: '180px' }}>
                       <div style={{ fontWeight: '700', color: '#1a56a0', marginBottom: '4px' }}>Case #{c.case_number}</div>

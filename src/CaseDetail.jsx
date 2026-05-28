@@ -551,7 +551,34 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     }).eq('id', caseId).select()
 
     if (!error) {
-      if (newStatus && newStatus !== oldStatus) await logAudit(caseId, `Status changed from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
+      if (newStatus && newStatus !== oldStatus) {
+  await logAudit(caseId, `Status changed from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
+  
+  // Send close notification if status is now closed/resolved
+  if (['resolved', 'closed'].includes(newStatus.toLowerCase()) && caseData.submitter_email) {
+    try {
+      await fetch(
+        `${SUPABASE_URL}/functions/v1/send-confirmation-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'case_closed',
+            email: caseData.submitter_email,
+            caseNumber: caseData.case_number,
+            location: caseData.location,
+            description: caseData.description,
+          }),
+        }
+      )
+    } catch (e) {
+      console.error('Close notification error:', e)
+    }
+  }
+}
       if (newIssueType && newIssueType !== oldIssueType) await logAudit(caseId, `Issue type changed from "${oldIssueType || 'none'}" to "${newIssueType}"`, userEmail)
       if (followupDate !== oldFollowup) {
         if (followupDate) await logAudit(caseId, `Follow-up due date set to ${followupDate}`, userEmail)
@@ -776,6 +803,33 @@ async function handleSaveDeptStatus() {
     await loadAuditLog()
     setAddingDept(false)
   }
+
+async function handleGeocode() {
+    if (!caseData.location) return
+    try {
+      const geoQuery = `${caseData.location}, Franklin, NH 03235`
+      const geoRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geoQuery)}&limit=1&countrycodes=us`,
+        { headers: { 'User-Agent': 'CityOfFranklinNH-ServiceRequests/1.0' } }
+      )
+      const geoData = await geoRes.json()
+      if (geoData && geoData.length > 0) {
+        await supabase.from('cases').update({
+          latitude: parseFloat(geoData[0].lat),
+          longitude: parseFloat(geoData[0].lon),
+        }).eq('id', caseId)
+        await logAudit(caseId, `Location geocoded`, userEmail)
+        await loadCase()
+        await loadAuditLog()
+        alert('Location geocoded successfully!')
+      } else {
+        alert('Could not geocode this address. Try making it more specific.')
+      }
+    } catch (e) {
+      alert('Geocoding failed. Please try again.')
+    }
+  }
+
 
   if (loading) return <div style={styles.loading}>Loading case...</div>
   if (!caseData) return <div style={styles.loading}>Case not found.</div>
@@ -1084,6 +1138,14 @@ async function handleSaveDeptStatus() {
                 <button style={saving ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveCase} disabled={saving}>
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
+                {isAdmin && caseData.issue_types && ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding'].includes(caseData.issue_types.name) && (
+  <button
+    style={{ ...styles.printBtn, width: '100%', marginBottom: '8px', fontSize: '12px' }}
+    onClick={handleGeocode}
+  >
+    📍 {caseData.latitude ? 'Re-Geocode Location' : 'Geocode Location'}
+  </button>
+)}
               </div>
             </div>
           )}
