@@ -430,7 +430,7 @@ if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && form
               <div style={styles.caseNumberValue}>{caseNumber}</div>
             </div>
             <p style={styles.successText}>
-              Please save your case number. You can use it to check the status
+              Please save your case number and bookmark this page. You can use it to check the status
               of your request on our public dashboard.
             </p>
             <p style={styles.successText}>
