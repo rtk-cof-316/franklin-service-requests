@@ -624,30 +624,21 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setSavingSubmitter(false)
   }
 
-  async function handleSaveDeptStatusAdmin(cdId, deptName) {
+async function handleSaveDeptStatusAdmin(cdId, deptName) {
     setSavingDeptId(cdId)
     const newStatusId = parseInt(deptStatusEdits[cdId])
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
     const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
 
-    const { error: followupError } = await supabase
-      .from('cases')
-      .update({ followup_due_date: followupDate || null })
-      .eq('id', caseId)
-
-    await supabase
+    const { error } = await supabase
       .from('case_departments')
-      .update({ status_id: parseInt(deptSelectedStatus) })
-      .eq('id', myDeptAssignment.id)
+      .update({ status_id: newStatusId })
+      .eq('id', cdId)
       .select()
+
     if (!error) {
       if (newStatusName && newStatusName !== oldStatusName) {
         await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
-      }
-      const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
-      if (followupDate !== oldFollowup) {
-        if (followupDate) await logAudit(caseId, `Follow-up due date set to ${followupDate} by ${myDeptAssignment.departments?.name}`, userEmail)
-        else await logAudit(caseId, `Follow-up due date cleared by ${myDeptAssignment.departments?.name}`, userEmail)
       }
       await loadCase()
       await loadAuditLog()
