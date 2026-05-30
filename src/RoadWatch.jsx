@@ -332,7 +332,7 @@ function RoadWatch() {
         <RoadVote />
 
         <div style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', paddingBottom: '24px' }}>
-          Data maintained by City of Franklin Municipal Services Department. Updated in real time.
+          Data maintained by City of Franklin. Updated in real time.
         </div>
       </div>
     </div>
