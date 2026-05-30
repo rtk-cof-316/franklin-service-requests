@@ -75,6 +75,7 @@ const styles = {
     fontWeight: '700',
     color: '#1a56a0',
     marginRight: '12px',
+    cursor: 'pointer',
   },
   alertLocation: {
     color: '#374151',
@@ -111,6 +112,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   tableTitle: {
     fontSize: '15px',
@@ -121,6 +124,7 @@ const styles = {
     display: 'flex',
     gap: '10px',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   filterSelect: {
     padding: '6px 10px',
@@ -241,21 +245,31 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
+const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
+
 function AdminDashboard({ onViewCase, refreshKey }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [deptFilter, setDeptFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState([])
+  const [departments, setDepartments] = useState([])
 
   useEffect(() => {
     loadCases()
     loadStatuses()
+    loadDepartments()
   }, [refreshKey])
 
   async function loadStatuses() {
     const { data } = await supabase.from('statuses').select('*').order('name')
     setStatuses(data || [])
+  }
+
+  async function loadDepartments() {
+    const { data } = await supabase.from('departments').select('*').order('name')
+    setDepartments(data || [])
   }
 
   async function loadCases() {
@@ -284,13 +298,15 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     setLoading(false)
   }
 
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-
   const filteredCases = cases.filter(c => {
     const statusName = (c.statuses?.name || '').toLowerCase()
     const isOpen = !closedStatuses.includes(statusName)
     if (statusFilter === 'open' && !isOpen) return false
     if (statusFilter === 'closed' && isOpen) return false
+    if (deptFilter !== 'all') {
+      const assignedDepts = c.case_departments?.map(cd => cd.departments?.name) || []
+      if (!assignedDepts.includes(deptFilter)) return false
+    }
     if (search.trim()) {
       const s = search.toLowerCase()
       return (
@@ -367,9 +383,17 @@ const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another 
               onChange={e => setStatusFilter(e.target.value)}
               style={styles.filterSelect}
             >
+              <option value="all">All Cases</option>
               <option value="open">Open Cases</option>
               <option value="closed">Closed Cases</option>
-              <option value="all">All Cases</option>
+            </select>
+            <select
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              style={styles.filterSelect}
+            >
+              <option value="all">All Departments</option>
+              {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
             </select>
           </div>
         </div>
