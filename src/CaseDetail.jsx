@@ -647,6 +647,14 @@ async function handleSaveDeptStatusAdmin(cdId, deptName) {
   }
 
 async function handleSaveDeptStatus() {
+  // Block closing if follow-up date is set
+const closingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
+const selectedStatusName = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name || ''
+if (closingStatuses.includes(selectedStatusName.toLowerCase()) && followupDate) {
+  alert('Please clear the follow-up due date before closing this case.')
+  setSavingDeptStatus(false)
+  return
+}
     if (!myDeptAssignment) return
     setSavingDeptStatus(true)
     setDeptSaveSuccess(false)
