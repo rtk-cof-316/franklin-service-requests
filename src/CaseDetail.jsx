@@ -372,7 +372,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [auditLog, setAuditLog] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Case update fields
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedIssueType, setSelectedIssueType] = useState('')
   const [followupDate, setFollowupDate] = useState('')
@@ -380,36 +379,29 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
-  // Submitter info editing
   const [submitterName, setSubmitterName] = useState('')
   const [submitterEmail, setSubmitterEmail] = useState('')
   const [submitterPhone, setSubmitterPhone] = useState('')
   const [savingSubmitter, setSavingSubmitter] = useState(false)
   const [submitterSuccess, setSubmitterSuccess] = useState(false)
 
-  // Dept status editing (admin)
   const [deptStatusEdits, setDeptStatusEdits] = useState({})
   const [savingDeptId, setSavingDeptId] = useState(null)
 
-  // Dept status (dept user)
   const [myDeptAssignment, setMyDeptAssignment] = useState(null)
   const [deptSelectedStatus, setDeptSelectedStatus] = useState('')
   const [savingDeptStatus, setSavingDeptStatus] = useState(false)
   const [deptSaveSuccess, setDeptSaveSuccess] = useState(false)
 
-  // Notes
   const [newNote, setNewNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
-  // Public comments
   const [newComment, setNewComment] = useState('')
   const [savingComment, setSavingComment] = useState(false)
 
-  // Dept assignment
   const [selectedDept, setSelectedDept] = useState('')
   const [addingDept, setAddingDept] = useState(false)
 
-  // RTK
   const [rtkData, setRtkData] = useState(null)
   const [rtkFields, setRtkFields] = useState({
     acknowledged_date: '',
@@ -456,7 +448,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       setSubmitterName(data.submitter_name || '')
       setSubmitterEmail(data.submitter_email || '')
       setSubmitterPhone(data.submitter_phone || '')
-      // Init dept status edits
       const edits = {}
       data.case_departments?.forEach(cd => { edits[cd.id] = cd.statuses?.id || '' })
       setDeptStatusEdits(edits)
@@ -552,33 +543,25 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
     if (!error) {
       if (newStatus && newStatus !== oldStatus) {
-  await logAudit(caseId, `Status changed from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
-  
-  // Send close notification if status is now closed/resolved
-  if (['resolved', 'closed'].includes(newStatus.toLowerCase()) && caseData.submitter_email) {
-    try {
-      await fetch(
-        `${SUPABASE_URL}/functions/v1/send-confirmation-email`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            type: 'case_closed',
-            email: caseData.submitter_email,
-            caseNumber: caseData.case_number,
-            location: caseData.location,
-            description: caseData.description,
-          }),
+        await logAudit(caseId, `Status changed from "${oldStatus || 'none'}" to "${newStatus}"`, userEmail)
+        if (['resolved', 'closed'].includes(newStatus.toLowerCase()) && caseData.submitter_email) {
+          try {
+            await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+              body: JSON.stringify({
+                type: 'case_closed',
+                email: caseData.submitter_email,
+                caseNumber: caseData.case_number,
+                location: caseData.location,
+                description: caseData.description,
+              }),
+            })
+          } catch (e) {
+            console.error('Close notification error:', e)
+          }
         }
-      )
-    } catch (e) {
-      console.error('Close notification error:', e)
-    }
-  }
-}
+      }
       if (newIssueType && newIssueType !== oldIssueType) await logAudit(caseId, `Issue type changed from "${oldIssueType || 'none'}" to "${newIssueType}"`, userEmail)
       if (followupDate !== oldFollowup) {
         if (followupDate) await logAudit(caseId, `Follow-up due date set to ${followupDate}`, userEmail)
@@ -624,7 +607,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setSavingSubmitter(false)
   }
 
-async function handleSaveDeptStatusAdmin(cdId, deptName) {
+  async function handleSaveDeptStatusAdmin(cdId, deptName) {
     setSavingDeptId(cdId)
     const newStatusId = parseInt(deptStatusEdits[cdId])
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
@@ -646,15 +629,14 @@ async function handleSaveDeptStatusAdmin(cdId, deptName) {
     setSavingDeptId(null)
   }
 
-async function handleSaveDeptStatus() {
-  // Block closing if follow-up date is set
-const closingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-const selectedStatusName = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name || ''
-if (closingStatuses.includes(selectedStatusName.toLowerCase()) && followupDate) {
-  alert('Please clear the follow-up due date before closing this case.')
-  setSavingDeptStatus(false)
-  return
-}
+  async function handleSaveDeptStatus() {
+    const closingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
+    const selectedStatusName = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name || ''
+    if (closingStatuses.includes(selectedStatusName.toLowerCase()) && followupDate) {
+      alert('Please clear the follow-up due date before closing this case.')
+      setSavingDeptStatus(false)
+      return
+    }
     if (!myDeptAssignment) return
     setSavingDeptStatus(true)
     setDeptSaveSuccess(false)
@@ -662,17 +644,9 @@ if (closingStatuses.includes(selectedStatusName.toLowerCase()) && followupDate) 
     const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
     const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
 
-    await supabase
-      .from('cases')
-      .update({ followup_due_date: followupDate || null })
-      .eq('id', caseId)
+    await supabase.from('cases').update({ followup_due_date: followupDate || null }).eq('id', caseId)
+    await supabase.from('case_departments').update({ status_id: parseInt(deptSelectedStatus) }).eq('id', myDeptAssignment.id)
 
-    await supabase
-      .from('case_departments')
-      .update({ status_id: parseInt(deptSelectedStatus) })
-      .eq('id', myDeptAssignment.id)
-
-    // Build audit message
     const auditParts = []
     if (newStatus && newStatus !== oldStatus) {
       auditParts.push(`${myDeptAssignment.departments?.name} status changed from "${oldStatus || 'none'}" to "${newStatus}"`)
@@ -803,7 +777,7 @@ if (closingStatuses.includes(selectedStatusName.toLowerCase()) && followupDate) 
     setAddingDept(false)
   }
 
-async function handleGeocode() {
+  async function handleGeocode() {
     if (!caseData.location) return
     try {
       const geoQuery = `${caseData.location}, Franklin, NH 03235`
@@ -829,6 +803,38 @@ async function handleGeocode() {
     }
   }
 
+  async function handleSendReminder(deptId, deptName) {
+    const lastUpdate = auditLog.find(e => e.action?.includes(deptName))
+    const lastUpdateText = lastUpdate
+      ? `Last update from ${deptName}: ${formatDateTime(lastUpdate.created_at)}`
+      : `No updates have been logged by ${deptName}`
+
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          type: 'department_reminder',
+          departmentId: deptId,
+          caseNumber: caseData.case_number,
+          location: caseData.location,
+          description: caseData.description,
+          departmentName: deptName,
+          lastUpdateText,
+        }),
+      })
+      await supabase.from('case_audit_log').insert([{
+        case_id: caseId,
+        action: `System reminder sent to ${deptName}`,
+        performed_by: 'System Notification',
+        created_at: new Date().toISOString(),
+      }])
+      await loadAuditLog()
+      alert(`Reminder sent to ${deptName}.`)
+    } catch (e) {
+      alert('Failed to send reminder. Please try again.')
+    }
+  }
 
   if (loading) return <div style={styles.loading}>Loading case...</div>
   if (!caseData) return <div style={styles.loading}>Case not found.</div>
@@ -892,7 +898,7 @@ async function handleGeocode() {
             </div>
           </div>
 
-          {/* 91-A Details */}
+          {/* 91-A Details — admin only */}
           {caseData.is_91a && isAdmin && (
             <div style={styles.card}>
               <div style={{ ...styles.cardHeader, ...styles.rtkHeader }}>
@@ -981,37 +987,66 @@ async function handleGeocode() {
             </div>
           )}
 
-          {/* Submitter Info — editable for admin */}
-          {isAdmin && (
+          {/* Submitter Info — editable for admin, read-only for dept */}
+          {(isAdmin || userRole === 'department') && (
             <div style={styles.card}>
               <div style={styles.cardHeader}>
                 <span style={styles.cardTitle}>Submitter Information</span>
                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>Internal only</span>
               </div>
               <div style={styles.cardBody}>
-                {submitterSuccess && <div style={styles.successMsg}>Submitter info updated.</div>}
-                <div style={styles.twoCol}>
-                  <div>
-                    <div style={styles.fieldLabel}>Name</div>
-                    <input type="text" style={styles.input} value={submitterName} onChange={e => setSubmitterName(e.target.value)} placeholder="Full name" />
-                  </div>
-                  <div>
-                    <div style={styles.fieldLabel}>Email</div>
-                    <input type="email" style={styles.input} value={submitterEmail} onChange={e => setSubmitterEmail(e.target.value)} placeholder="email@example.com" />
-                  </div>
-                </div>
-                <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
-                  <div style={styles.fieldLabel}>Phone</div>
-                  <input type="tel" style={styles.input} value={submitterPhone} onChange={e => setSubmitterPhone(e.target.value)} placeholder="(603) 000-0000" />
-                </div>
-                {caseData.requestor_id && (
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
-                    <strong>Requestor ID:</strong> {caseData.requestor_id}
+                {isAdmin ? (
+                  <>
+                    {submitterSuccess && <div style={styles.successMsg}>Submitter info updated.</div>}
+                    <div style={styles.twoCol}>
+                      <div>
+                        <div style={styles.fieldLabel}>Name</div>
+                        <input type="text" style={styles.input} value={submitterName} onChange={e => setSubmitterName(e.target.value)} placeholder="Full name" />
+                      </div>
+                      <div>
+                        <div style={styles.fieldLabel}>Email</div>
+                        <input type="email" style={styles.input} value={submitterEmail} onChange={e => setSubmitterEmail(e.target.value)} placeholder="email@example.com" />
+                      </div>
+                    </div>
+                    <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
+                      <div style={styles.fieldLabel}>Phone</div>
+                      <input type="tel" style={styles.input} value={submitterPhone} onChange={e => setSubmitterPhone(e.target.value)} placeholder="(603) 000-0000" />
+                    </div>
+                    {caseData.requestor_id && (
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
+                        <strong>Requestor ID:</strong> {caseData.requestor_id}
+                      </div>
+                    )}
+                    <button style={savingSubmitter ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveSubmitter} disabled={savingSubmitter}>
+                      {savingSubmitter ? 'Saving...' : 'Save Submitter Info'}
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '14px', color: '#111827', lineHeight: '1.8' }}>
+                    <div style={styles.fieldRow}>
+                      <div style={styles.fieldLabel}>Name</div>
+                      <div style={styles.fieldValue}>{caseData.submitter_name || '—'}</div>
+                    </div>
+                    <hr style={styles.divider} />
+                    <div style={styles.fieldRow}>
+                      <div style={styles.fieldLabel}>Email</div>
+                      <div style={styles.fieldValue}>
+                        {caseData.submitter_email
+                          ? <a href={`mailto:${caseData.submitter_email}`} style={{ color: '#1a56a0' }}>{caseData.submitter_email}</a>
+                          : '—'}
+                      </div>
+                    </div>
+                    <hr style={styles.divider} />
+                    <div style={styles.fieldRow}>
+                      <div style={styles.fieldLabel}>Phone</div>
+                      <div style={styles.fieldValue}>
+                        {caseData.submitter_phone
+                          ? <a href={`tel:${caseData.submitter_phone}`} style={{ color: '#1a56a0' }}>{caseData.submitter_phone}</a>
+                          : '—'}
+                      </div>
+                    </div>
                   </div>
                 )}
-                <button style={savingSubmitter ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveSubmitter} disabled={savingSubmitter}>
-                  {savingSubmitter ? 'Saving...' : 'Save Submitter Info'}
-                </button>
               </div>
             </div>
           )}
@@ -1066,6 +1101,7 @@ async function handleGeocode() {
               )}
             </div>
           </div>
+
           {/* Attachments */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
@@ -1073,13 +1109,10 @@ async function handleGeocode() {
               <span style={{ fontSize: '11px', color: '#9ca3af' }}>Visible to public</span>
             </div>
             <div style={styles.cardBody}>
-              <CaseFiles
-                caseId={caseId}
-                canUpload={true}
-                uploadedBy={userEmail}
-              />
+              <CaseFiles caseId={caseId} canUpload={true} uploadedBy={userEmail} />
             </div>
           </div>
+
           {/* Audit Log */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
@@ -1138,46 +1171,46 @@ async function handleGeocode() {
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 {isAdmin && caseData.issue_types && ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding'].includes(caseData.issue_types.name) && (
-  <button
-    style={{ ...styles.printBtn, width: '100%', marginBottom: '8px', fontSize: '12px' }}
-    onClick={handleGeocode}
-  >
-    📍 {caseData.latitude ? 'Re-Geocode Location' : 'Geocode Location'}
-  </button>
-)}
+                  <button
+                    style={{ ...styles.printBtn, width: '100%', marginBottom: '8px', fontSize: '12px' }}
+                    onClick={handleGeocode}
+                  >
+                    📍 {caseData.latitude ? 'Re-Geocode Location' : 'Geocode Location'}
+                  </button>
+                )}
               </div>
             </div>
           )}
 
           {/* Dept user status panel */}
           {!isAdmin && myDeptAssignment && (
-  <div style={styles.card}>
-    <div style={styles.cardHeader}>
-      <span style={styles.cardTitle}>My Department Status</span>
-    </div>
-    <div style={styles.cardBody}>
-      {deptSaveSuccess && <div style={styles.successMsg}>Status updated successfully.</div>}
-      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
-        Update your department's status and follow-up date for this case.
-      </div>
-      <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Your Department's Status</div>
-      <select style={styles.select} value={deptSelectedStatus} onChange={e => setDeptSelectedStatus(e.target.value)}>
-        <option value="">-- Select status --</option>
-        {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      <div style={{ ...styles.fieldLabel, marginBottom: '4px' }}>Follow-up Due Date</div>
-      <div style={styles.inputHint}>Clear this date to remove from follow-up tracking</div>
-      <input type="date" style={styles.input} value={followupDate} onChange={e => setFollowupDate(e.target.value)} />
-      <button
-        style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn}
-        onClick={handleSaveDeptStatus}
-        disabled={savingDeptStatus}
-      >
-        {savingDeptStatus ? 'Saving...' : 'Update My Status'}
-      </button>
-    </div>
-  </div>
-)}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <span style={styles.cardTitle}>My Department Status</span>
+              </div>
+              <div style={styles.cardBody}>
+                {deptSaveSuccess && <div style={styles.successMsg}>Status updated successfully.</div>}
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '10px' }}>
+                  Update your department's status and follow-up date for this case.
+                </div>
+                <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Your Department's Status</div>
+                <select style={styles.select} value={deptSelectedStatus} onChange={e => setDeptSelectedStatus(e.target.value)}>
+                  <option value="">-- Select status --</option>
+                  {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <div style={{ ...styles.fieldLabel, marginBottom: '4px' }}>Follow-up Due Date</div>
+                <div style={styles.inputHint}>Clear this date to remove from follow-up tracking</div>
+                <input type="date" style={styles.input} value={followupDate} onChange={e => setFollowupDate(e.target.value)} />
+                <button
+                  style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn}
+                  onClick={handleSaveDeptStatus}
+                  disabled={savingDeptStatus}
+                >
+                  {savingDeptStatus ? 'Saving...' : 'Update My Status'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Departments panel */}
           <div style={styles.card}>
@@ -1191,8 +1224,8 @@ async function handleGeocode() {
                 caseData.case_departments?.map((cd) => (
                   <div key={cd.id} style={{ ...styles.deptRow, flexDirection: 'column', alignItems: 'stretch' }}>
                     <div style={{ backgroundColor: '#f3f4f6', padding: '6px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '4px' }}>
-  {cd.departments?.name}
-</div>
+                      {cd.departments?.name}
+                    </div>
                     {isAdmin ? (
                       <div style={{ display: 'flex', gap: '6px', width: '100%', marginTop: '4px' }}>
                         <select
@@ -1209,6 +1242,13 @@ async function handleGeocode() {
                           disabled={savingDeptId === cd.id}
                         >
                           {savingDeptId === cd.id ? '...' : 'Save'}
+                        </button>
+                        <button
+                          style={{ padding: '5px 10px', backgroundColor: '#ffffff', border: '1px solid #d97706', color: '#d97706', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          onClick={() => handleSendReminder(cd.department_id, cd.departments?.name)}
+                          title="Send system reminder to this department"
+                        >
+                          🔔 Remind
                         </button>
                       </div>
                     ) : (
