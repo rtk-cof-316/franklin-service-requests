@@ -3,330 +3,51 @@ import { supabase } from './supabaseClient'
 import CaseFiles from './CaseFiles'
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    backgroundColor: '#f0f4f8',
-    padding: '32px 24px',
-    fontFamily: "'Segoe UI', Arial, sans-serif",
-  },
-  topBar: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  backBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#1a56a0',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    padding: '0',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  printBtn: {
-    padding: '6px 14px',
-    backgroundColor: '#ffffff',
-    border: '1px solid #1a56a0',
-    color: '#1a56a0',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  exportBtn: {
-    padding: '6px 14px',
-    backgroundColor: '#1a56a0',
-    border: 'none',
-    color: '#ffffff',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 340px',
-    gap: '20px',
-    alignItems: 'start',
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-    marginBottom: '20px',
-  },
-  cardHeader: {
-    padding: '14px 20px',
-    borderBottom: '1px solid #e5e7eb',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardTitle: {
-    fontSize: '13px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    color: '#6b7280',
-  },
-  cardBody: {
-    padding: '20px',
-  },
-  caseNumberRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '16px',
-  },
-  caseNumber: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#1a56a0',
-  },
-  tag91a: {
-    backgroundColor: '#eff6ff',
-    color: '#1a56a0',
-    border: '1px solid #bfdbfe',
-    borderRadius: '4px',
-    padding: '2px 8px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  fieldRow: {
-    marginBottom: '14px',
-  },
-  fieldLabel: {
-    fontSize: '11px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    color: '#9ca3af',
-    marginBottom: '3px',
-  },
-  fieldValue: {
-    fontSize: '14px',
-    color: '#111827',
-    lineHeight: '1.5',
-  },
-  divider: {
-    border: 'none',
-    borderTop: '1px solid #f3f4f6',
-    margin: '14px 0',
-  },
-  statusBadge: {
-    padding: '4px 12px',
-    borderRadius: '20px',
-    fontSize: '13px',
-    fontWeight: '600',
-    display: 'inline-block',
-  },
-  select: {
-    width: '100%',
-    padding: '8px 10px',
-    fontSize: '13px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    color: '#111827',
-    backgroundColor: '#ffffff',
-    outline: 'none',
-    marginBottom: '10px',
-  },
-  input: {
-    width: '100%',
-    padding: '8px 10px',
-    fontSize: '13px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    color: '#111827',
-    outline: 'none',
-    marginBottom: '10px',
-    boxSizing: 'border-box',
-  },
-  inputHint: {
-    fontSize: '11px',
-    color: '#9ca3af',
-    marginBottom: '6px',
-    marginTop: '-6px',
-  },
-  twoCol: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '10px',
-  },
-  saveBtn: {
-    width: '100%',
-    padding: '9px',
-    backgroundColor: '#1a56a0',
-    color: '#ffffff',
-    fontSize: '13px',
-    fontWeight: '600',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    marginBottom: '8px',
-  },
-  saveBtnDisabled: {
-    width: '100%',
-    padding: '9px',
-    backgroundColor: '#93afd4',
-    color: '#ffffff',
-    fontSize: '13px',
-    fontWeight: '600',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'not-allowed',
-    marginBottom: '8px',
-  },
-  deptRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 0',
-    borderBottom: '1px solid #f3f4f6',
-    gap: '10px',
-  },
-  deptName: {
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#374151',
-    minWidth: '100px',
-  },
-  deptStatus: {
-    fontSize: '12px',
-    color: '#6b7280',
-  },
-  addDeptRow: {
-    display: 'flex',
-    gap: '8px',
-    marginTop: '12px',
-  },
-  addBtn: {
-    padding: '7px 14px',
-    backgroundColor: '#1a56a0',
-    color: '#ffffff',
-    fontSize: '12px',
-    fontWeight: '600',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  },
-  noteBox: {
-    backgroundColor: '#f9fafb',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    padding: '12px',
-    marginBottom: '10px',
-  },
-  commentBox: {
-    backgroundColor: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    borderRadius: '6px',
-    padding: '12px',
-    marginBottom: '10px',
-  },
-  noteMeta: {
-    fontSize: '11px',
-    color: '#9ca3af',
-    marginBottom: '4px',
-  },
-  noteText: {
-    fontSize: '13px',
-    color: '#374151',
-    lineHeight: '1.5',
-  },
-  textarea: {
-    width: '100%',
-    padding: '8px 10px',
-    fontSize: '13px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    color: '#111827',
-    resize: 'vertical',
-    minHeight: '80px',
-    outline: 'none',
-    boxSizing: 'border-box',
-    marginBottom: '8px',
-  },
-  successMsg: {
-    fontSize: '12px',
-    color: '#065f46',
-    backgroundColor: '#d1fae5',
-    padding: '6px 10px',
-    borderRadius: '4px',
-    marginBottom: '8px',
-  },
-  loading: {
-    padding: '60px',
-    textAlign: 'center',
-    color: '#6b7280',
-  },
-  auditRow: {
-    display: 'flex',
-    gap: '12px',
-    padding: '10px 0',
-    borderBottom: '1px solid #f3f4f6',
-    alignItems: 'flex-start',
-  },
-  auditDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    backgroundColor: '#1a56a0',
-    marginTop: '5px',
-    flexShrink: 0,
-  },
-  auditAction: {
-    fontSize: '13px',
-    color: '#374151',
-    flex: 1,
-    lineHeight: '1.4',
-  },
-  auditMeta: {
-    fontSize: '11px',
-    color: '#9ca3af',
-    whiteSpace: 'nowrap',
-    marginLeft: '8px',
-  },
-  rtkHeader: {
-    backgroundColor: '#eff6ff',
-    borderBottom: '1px solid #bfdbfe',
-  },
-  rtkTitle: {
-    color: '#1a56a0',
-  },
-  checkboxRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '10px',
-    fontSize: '13px',
-    color: '#374151',
-  },
-  sectionDivider: {
-    fontSize: '11px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    color: '#1a56a0',
-    borderBottom: '1px solid #e5e7eb',
-    paddingBottom: '6px',
-    marginBottom: '12px',
-    marginTop: '16px',
-  },
-  publicBadge: {
-    fontSize: '11px',
-    color: '#065f46',
-    backgroundColor: '#d1fae5',
-    padding: '2px 8px',
-    borderRadius: '4px',
-    fontWeight: '600',
-  },
+  page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
+  topBar: { display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' },
+  backBtn: { background: 'none', border: 'none', color: '#1a56a0', fontSize: '14px', fontWeight: '600', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', gap: '6px' },
+  printBtn: { padding: '6px 14px', backgroundColor: '#ffffff', border: '1px solid #1a56a0', color: '#1a56a0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+  exportBtn: { padding: '6px 14px', backgroundColor: '#1a56a0', border: 'none', color: '#ffffff', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+  grid: { display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' },
+  card: { backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: '20px' },
+  cardHeader: { padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  cardTitle: { fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6b7280' },
+  cardBody: { padding: '20px' },
+  caseNumberRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' },
+  caseNumber: { fontSize: '24px', fontWeight: '700', color: '#1a56a0' },
+  tag91a: { backgroundColor: '#eff6ff', color: '#1a56a0', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: '600' },
+  fieldRow: { marginBottom: '14px' },
+  fieldLabel: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#9ca3af', marginBottom: '3px' },
+  fieldValue: { fontSize: '14px', color: '#111827', lineHeight: '1.5' },
+  divider: { border: 'none', borderTop: '1px solid #f3f4f6', margin: '14px 0' },
+  statusBadge: { padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', display: 'inline-block' },
+  select: { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', color: '#111827', backgroundColor: '#ffffff', outline: 'none', marginBottom: '10px' },
+  input: { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', color: '#111827', outline: 'none', marginBottom: '10px', boxSizing: 'border-box' },
+  inputHint: { fontSize: '11px', color: '#9ca3af', marginBottom: '6px', marginTop: '-6px' },
+  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
+  saveBtn: { width: '100%', padding: '9px', backgroundColor: '#1a56a0', color: '#ffffff', fontSize: '13px', fontWeight: '600', border: 'none', borderRadius: '6px', cursor: 'pointer', marginBottom: '8px' },
+  saveBtnDisabled: { width: '100%', padding: '9px', backgroundColor: '#93afd4', color: '#ffffff', fontSize: '13px', fontWeight: '600', border: 'none', borderRadius: '6px', cursor: 'not-allowed', marginBottom: '8px' },
+  deptRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f3f4f6', gap: '10px' },
+  deptName: { fontSize: '13px', fontWeight: '600', color: '#374151', minWidth: '100px' },
+  deptStatus: { fontSize: '12px', color: '#6b7280' },
+  addDeptRow: { display: 'flex', gap: '8px', marginTop: '12px' },
+  addBtn: { padding: '7px 14px', backgroundColor: '#1a56a0', color: '#ffffff', fontSize: '12px', fontWeight: '600', border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  noteBox: { backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px', marginBottom: '10px' },
+  commentBox: { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '12px', marginBottom: '10px' },
+  noteMeta: { fontSize: '11px', color: '#9ca3af', marginBottom: '4px' },
+  noteText: { fontSize: '13px', color: '#374151', lineHeight: '1.5' },
+  textarea: { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', color: '#111827', resize: 'vertical', minHeight: '80px', outline: 'none', boxSizing: 'border-box', marginBottom: '8px' },
+  successMsg: { fontSize: '12px', color: '#065f46', backgroundColor: '#d1fae5', padding: '6px 10px', borderRadius: '4px', marginBottom: '8px' },
+  loading: { padding: '60px', textAlign: 'center', color: '#6b7280' },
+  auditRow: { display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start' },
+  auditDot: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#1a56a0', marginTop: '5px', flexShrink: 0 },
+  auditAction: { fontSize: '13px', color: '#374151', flex: 1, lineHeight: '1.4' },
+  auditMeta: { fontSize: '11px', color: '#9ca3af', whiteSpace: 'nowrap', marginLeft: '8px' },
+  rtkHeader: { backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe' },
+  rtkTitle: { color: '#1a56a0' },
+  checkboxRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', fontSize: '13px', color: '#374151' },
+  sectionDivider: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1a56a0', borderBottom: '1px solid #e5e7eb', paddingBottom: '6px', marginBottom: '12px', marginTop: '16px' },
+  publicBadge: { fontSize: '11px', color: '#065f46', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' },
 }
 
 function getStatusStyle(name) {
@@ -349,12 +70,7 @@ function formatDateTime(dateStr) {
 }
 
 async function logAudit(caseId, action, performedBy) {
-  await supabase.from('case_audit_log').insert([{
-    case_id: caseId,
-    action,
-    performed_by: performedBy,
-    created_at: new Date().toISOString(),
-  }])
+  await supabase.from('case_audit_log').insert([{ case_id: caseId, action, performed_by: performedBy, created_at: new Date().toISOString() }])
 }
 
 const DELIVERY_METHODS = ['City USB', 'Self USB', 'In Person Viewing', 'Print', 'Mailed', 'Hold for Pick Up']
@@ -404,24 +120,21 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
   const [rtkData, setRtkData] = useState(null)
   const [rtkFields, setRtkFields] = useState({
-    acknowledged_date: '',
-    request_topic: '',
-    number_of_records: '',
-    hours_worked: '',
-    hours_worked_closed: '',
-    fees_assessed: '',
-    fees_collected: '',
-    tax_dollar_spent: '',
-    date_records_ready: '',
-    date_requestor_notified: '',
-    appointment_datetime: '',
-    delivery_method: '',
-    mailed: false,
-    tracking_number: '',
-    hold_for_pickup: false,
+    acknowledged_date: '', request_topic: '', number_of_records: '', hours_worked: '',
+    hours_worked_closed: '', fees_assessed: '', fees_collected: '', tax_dollar_spent: '',
+    date_records_ready: '', date_requestor_notified: '', appointment_datetime: '',
+    delivery_method: '', mailed: false, tracking_number: '', hold_for_pickup: false,
   })
   const [savingRtk, setSavingRtk] = useState(false)
   const [rtkSuccess, setRtkSuccess] = useState(false)
+
+  // Time log state
+  const [timeLog, setTimeLog] = useState([])
+  const [timeMinutes, setTimeMinutes] = useState('')
+  const [timeInitials, setTimeInitials] = useState('')
+  const [timeRate, setTimeRate] = useState('')
+  const [savingTimeLog, setSavingTimeLog] = useState(false)
+  const [timeLogSuccess, setTimeLogSuccess] = useState(false)
 
   const isAdmin = userRole === 'admin'
 
@@ -429,7 +142,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
 
   async function loadAll() {
     setLoading(true)
-    await Promise.all([loadCase(), loadStatuses(), loadIssueTypes(), loadDepartments(), loadRequestTopics(), loadNotes(), loadComments(), loadAuditLog()])
+    await Promise.all([loadCase(), loadStatuses(), loadIssueTypes(), loadDepartments(), loadRequestTopics(), loadNotes(), loadComments(), loadAuditLog(), loadTimeLog()])
     setLoading(false)
   }
 
@@ -454,10 +167,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       if (data.is_91a) loadRtkData()
       if (userRole === 'department' && userDepartmentId) {
         const myAssignment = data.case_departments?.find(cd => cd.department_id === userDepartmentId)
-        if (myAssignment) {
-          setMyDeptAssignment(myAssignment)
-          setDeptSelectedStatus(myAssignment.statuses?.id || '')
-        }
+        if (myAssignment) { setMyDeptAssignment(myAssignment); setDeptSelectedStatus(myAssignment.statuses?.id || '') }
       }
     }
   }
@@ -521,6 +231,11 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setAuditLog(data || [])
   }
 
+  async function loadTimeLog() {
+    const { data } = await supabase.from('case_time_log').select('*').eq('case_id', caseId).order('created_at', { ascending: true })
+    setTimeLog(data || [])
+  }
+
   const adminStatuses = allStatuses
   const deptStatuses = allStatuses.filter(s => !s.is_91a_only)
 
@@ -549,17 +264,9 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
             await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-              body: JSON.stringify({
-                type: 'case_closed',
-                email: caseData.submitter_email,
-                caseNumber: caseData.case_number,
-                location: caseData.location,
-                description: caseData.description,
-              }),
+              body: JSON.stringify({ type: 'case_closed', email: caseData.submitter_email, caseNumber: caseData.case_number, location: caseData.location, description: caseData.description }),
             })
-          } catch (e) {
-            console.error('Close notification error:', e)
-          }
+          } catch (e) { console.error('Close notification error:', e) }
         }
       }
       if (newIssueType && newIssueType !== oldIssueType) await logAudit(caseId, `Issue type changed from "${oldIssueType || 'none'}" to "${newIssueType}"`, userEmail)
@@ -590,13 +297,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     if (submitterName !== (caseData.submitter_name || '')) changes.push('Name updated')
     if (submitterEmail !== (caseData.submitter_email || '')) changes.push('Email updated')
     if (submitterPhone !== (caseData.submitter_phone || '')) changes.push('Phone updated')
-
-    const { error } = await supabase.from('cases').update({
-      submitter_name: submitterName || null,
-      submitter_email: submitterEmail || null,
-      submitter_phone: submitterPhone || null,
-    }).eq('id', caseId).select()
-
+    const { error } = await supabase.from('cases').update({ submitter_name: submitterName || null, submitter_email: submitterEmail || null, submitter_phone: submitterPhone || null }).eq('id', caseId).select()
     if (!error) {
       if (changes.length > 0) await logAudit(caseId, `Submitter info updated: ${changes.join(', ')}`, userEmail)
       setSubmitterSuccess(true)
@@ -612,13 +313,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const newStatusId = parseInt(deptStatusEdits[cdId])
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
     const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
-
-    const { error } = await supabase
-      .from('case_departments')
-      .update({ status_id: newStatusId })
-      .eq('id', cdId)
-      .select()
-
+    const { error } = await supabase.from('case_departments').update({ status_id: newStatusId }).eq('id', cdId).select()
     if (!error) {
       if (newStatusName && newStatusName !== oldStatusName) {
         await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
@@ -643,28 +338,17 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const oldStatus = myDeptAssignment.statuses?.name
     const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
     const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
-
     await supabase.from('cases').update({ followup_due_date: followupDate || null }).eq('id', caseId)
     await supabase.from('case_departments').update({ status_id: parseInt(deptSelectedStatus) }).eq('id', myDeptAssignment.id)
-
     const auditParts = []
-    if (newStatus && newStatus !== oldStatus) {
-      auditParts.push(`${myDeptAssignment.departments?.name} status changed from "${oldStatus || 'none'}" to "${newStatus}"`)
-    }
+    if (newStatus && newStatus !== oldStatus) auditParts.push(`${myDeptAssignment.departments?.name} status changed from "${oldStatus || 'none'}" to "${newStatus}"`)
     if (followupDate !== oldFollowup) {
       if (followupDate) auditParts.push(`Follow-up due date set to ${followupDate}`)
       else auditParts.push(`Follow-up due date cleared`)
     }
-
     if (auditParts.length > 0) {
-      await supabase.from('case_audit_log').insert([{
-        case_id: caseId,
-        action: auditParts.join(', '),
-        performed_by: userEmail,
-        created_at: new Date().toISOString(),
-      }])
+      await supabase.from('case_audit_log').insert([{ case_id: caseId, action: auditParts.join(', '), performed_by: userEmail, created_at: new Date().toISOString() }])
     }
-
     setDeptSaveSuccess(true)
     await loadCase()
     await loadAuditLog()
@@ -708,7 +392,6 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       if (rtkFields.date_records_ready !== (rtkData?.date_records_ready?.slice(0, 10) || '')) changes.push('Date records ready updated')
       if (rtkFields.date_requestor_notified !== (rtkData?.date_requestor_notified?.slice(0, 10) || '')) changes.push('Date requestor notified updated')
       if (rtkFields.appointment_datetime !== (rtkData?.appointment_datetime?.slice(0, 16) || '')) changes.push('Appointment updated')
-
       const auditMessage = changes.length > 0 ? `91-A details updated: ${changes.join(', ')}` : '91-A details saved (no changes)'
       await logAudit(caseId, auditMessage, userEmail)
       setRtkSuccess(true)
@@ -746,31 +429,15 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     setAddingDept(true)
     const defaultStatus = allStatuses.find(s => s.name === 'Received')
     const deptName = departments.find(d => d.id === parseInt(selectedDept))?.name
-
-    await supabase.from('case_departments').insert([{
-      case_id: caseId,
-      department_id: parseInt(selectedDept),
-      status_id: defaultStatus?.id || allStatuses[0]?.id,
-    }])
+    await supabase.from('case_departments').insert([{ case_id: caseId, department_id: parseInt(selectedDept), status_id: defaultStatus?.id || allStatuses[0]?.id }])
     await logAudit(caseId, `Assigned to ${deptName}`, userEmail)
-
     try {
       await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
-          type: 'department_assignment',
-          departmentId: parseInt(selectedDept),
-          caseNumber: caseData.case_number,
-          location: caseData.location,
-          description: caseData.description,
-          departmentName: deptName,
-        }),
+        body: JSON.stringify({ type: 'department_assignment', departmentId: parseInt(selectedDept), caseNumber: caseData.case_number, location: caseData.location, description: caseData.description, departmentName: deptName }),
       })
-    } catch (e) {
-      console.error('Email notification error:', e)
-    }
-
+    } catch (e) { console.error('Email notification error:', e) }
     setSelectedDept('')
     await loadCase()
     await loadAuditLog()
@@ -781,16 +448,10 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     if (!caseData.location) return
     try {
       const geoQuery = `${caseData.location}, Franklin, NH 03235`
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geoQuery)}&limit=1&countrycodes=us`,
-        { headers: { 'User-Agent': 'CityOfFranklinNH-ServiceRequests/1.0' } }
-      )
+      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geoQuery)}&limit=1&countrycodes=us`, { headers: { 'User-Agent': 'CityOfFranklinNH-ServiceRequests/1.0' } })
       const geoData = await geoRes.json()
       if (geoData && geoData.length > 0) {
-        await supabase.from('cases').update({
-          latitude: parseFloat(geoData[0].lat),
-          longitude: parseFloat(geoData[0].lon),
-        }).eq('id', caseId)
+        await supabase.from('cases').update({ latitude: parseFloat(geoData[0].lat), longitude: parseFloat(geoData[0].lon) }).eq('id', caseId)
         await logAudit(caseId, `Location geocoded`, userEmail)
         await loadCase()
         await loadAuditLog()
@@ -798,9 +459,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       } else {
         alert('Could not geocode this address. Try making it more specific.')
       }
-    } catch (e) {
-      alert('Geocoding failed. Please try again.')
-    }
+    } catch (e) { alert('Geocoding failed. Please try again.') }
   }
 
   async function handleSendReminder(deptId, deptName) {
@@ -808,32 +467,48 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     const lastUpdateText = lastUpdate
       ? `Last update from ${deptName}: ${formatDateTime(lastUpdate.created_at)}`
       : `No updates have been logged by ${deptName}`
-
     try {
       await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
-          type: 'department_reminder',
-          departmentId: deptId,
-          caseNumber: caseData.case_number,
-          location: caseData.location,
-          description: caseData.description,
-          departmentName: deptName,
-          lastUpdateText,
-        }),
+        body: JSON.stringify({ type: 'department_reminder', departmentId: deptId, caseNumber: caseData.case_number, location: caseData.location, description: caseData.description, departmentName: deptName, lastUpdateText }),
       })
-      await supabase.from('case_audit_log').insert([{
-        case_id: caseId,
-        action: `System reminder sent to ${deptName}`,
-        performed_by: 'System Notification',
-        created_at: new Date().toISOString(),
-      }])
+      await supabase.from('case_audit_log').insert([{ case_id: caseId, action: `System reminder sent to ${deptName}`, performed_by: 'System Notification', created_at: new Date().toISOString() }])
       await loadAuditLog()
       alert(`Reminder sent to ${deptName}.`)
-    } catch (e) {
-      alert('Failed to send reminder. Please try again.')
-    }
+    } catch (e) { alert('Failed to send reminder. Please try again.') }
+  }
+
+  async function handleAddTimeLog() {
+    if (!timeMinutes || !timeInitials || !timeRate) return
+    setSavingTimeLog(true)
+    setTimeLogSuccess(false)
+    const mins = parseInt(timeMinutes)
+    const rate = parseFloat(timeRate)
+    const cost = parseFloat(((mins / 60) * rate).toFixed(2))
+    await supabase.from('case_time_log').insert([{
+      case_id: caseId,
+      minutes: mins,
+      initials: timeInitials.trim().toUpperCase(),
+      hourly_rate: rate,
+      cost,
+      logged_by: userEmail,
+      created_at: new Date().toISOString(),
+    }])
+    // Recalculate total tax_dollar_spent from all entries
+    const { data: allEntries } = await supabase.from('case_time_log').select('cost').eq('case_id', caseId)
+    const totalCost = allEntries ? allEntries.reduce((sum, e) => sum + parseFloat(e.cost), 0) : cost
+    await supabase.from('details_91a').update({ tax_dollar_spent: parseFloat(totalCost.toFixed(2)) }).eq('case_id', caseId)
+    await logAudit(caseId, `Time logged on this case (${mins} min, ${timeInitials.toUpperCase()})`, userEmail)
+    setTimeMinutes('')
+    setTimeInitials('')
+    setTimeRate('')
+    setTimeLogSuccess(true)
+    await loadTimeLog()
+    await loadRtkData()
+    await loadAuditLog()
+    setSavingTimeLog(false)
+    setTimeout(() => setTimeLogSuccess(false), 3000)
   }
 
   if (loading) return <div style={styles.loading}>Loading case...</div>
@@ -842,6 +517,8 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const assignedDeptNames = caseData.case_departments?.map(cd => cd.departments?.name) || []
   const availableDepts = departments.filter(d => !assignedDeptNames.includes(d.name))
   const showAppointment = APPOINTMENT_METHODS.includes(rtkFields.delivery_method)
+  const totalTimeMinutes = timeLog.reduce((sum, e) => sum + e.minutes, 0)
+  const totalTimeCost = timeLog.reduce((sum, e) => sum + parseFloat(e.cost), 0)
 
   return (
     <div style={styles.page}>
@@ -949,8 +626,8 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 </div>
                 <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
                   <div style={styles.fieldLabel}>Tax Dollars Spent ($)</div>
-                  <div style={styles.inputHint}>Total cost to the city for fulfilling this request</div>
-                  <input type="number" step="0.01" style={styles.input} placeholder="0.00" value={rtkFields.tax_dollar_spent} onChange={e => setRtkFields(prev => ({ ...prev, tax_dollar_spent: e.target.value }))} />
+                  <div style={styles.inputHint}>Auto-updated from time log entries below</div>
+                  <input type="number" step="0.01" style={{ ...styles.input, backgroundColor: '#f9fafb', color: '#6b7280' }} placeholder="0.00" value={rtkFields.tax_dollar_spent} readOnly />
                 </div>
                 <div style={styles.sectionDivider}>Fulfillment</div>
                 <div style={styles.twoCol}>
@@ -983,6 +660,82 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 <button style={savingRtk ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveRtk} disabled={savingRtk}>
                   {savingRtk ? 'Saving...' : 'Save 91-A Details'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* 91-A Time Log — admin only */}
+          {caseData.is_91a && isAdmin && (
+            <div style={styles.card}>
+              <div style={{ ...styles.cardHeader, ...styles.rtkHeader }}>
+                <span style={{ ...styles.cardTitle, ...styles.rtkTitle }}>⏱ Time Log</span>
+                <span style={{ fontSize: '11px', color: '#1a56a0' }}>Admin only — auto-updates tax dollars spent</span>
+              </div>
+              <div style={styles.cardBody}>
+                {timeLogSuccess && <div style={styles.successMsg}>Time entry saved and tax dollars spent updated.</div>}
+
+                {/* Add entry form */}
+                <div style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '14px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#374151', marginBottom: '10px' }}>Log Time Entry</div>
+                  <div style={styles.twoCol}>
+                    <div>
+                      <div style={styles.fieldLabel}>Minutes Worked</div>
+                      <input type="number" min="1" style={styles.input} placeholder="e.g. 30" value={timeMinutes} onChange={e => setTimeMinutes(e.target.value)} />
+                    </div>
+                    <div>
+                      <div style={styles.fieldLabel}>Staff Initials (2 chars)</div>
+                      <input type="text" maxLength={2} style={styles.input} placeholder="BD" value={timeInitials} onChange={e => setTimeInitials(e.target.value.toUpperCase())} />
+                    </div>
+                  </div>
+                  <div style={{ maxWidth: '50%', paddingRight: '5px' }}>
+                    <div style={styles.fieldLabel}>Hourly Rate ($)</div>
+                    <input type="number" step="0.01" style={styles.input} placeholder="e.g. 25.00" value={timeRate} onChange={e => setTimeRate(e.target.value)} />
+                  </div>
+                  {timeMinutes && timeRate && parseFloat(timeMinutes) > 0 && parseFloat(timeRate) > 0 && (
+                    <div style={{ fontSize: '12px', color: '#1a56a0', marginBottom: '8px', fontWeight: '600' }}>
+                      Cost for this entry: ${((parseFloat(timeMinutes) / 60) * parseFloat(timeRate)).toFixed(2)}
+                    </div>
+                  )}
+                  <button
+                    style={savingTimeLog || !timeMinutes || !timeInitials || !timeRate ? styles.saveBtnDisabled : styles.saveBtn}
+                    onClick={handleAddTimeLog}
+                    disabled={savingTimeLog || !timeMinutes || !timeInitials || !timeRate}
+                  >
+                    {savingTimeLog ? 'Saving...' : 'Log Time'}
+                  </button>
+                </div>
+
+                {/* Time log entries */}
+                {timeLog.length === 0 ? (
+                  <div style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic' }}>No time entries yet.</div>
+                ) : (
+                  <>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
+                      <thead>
+                        <tr>
+                          {['Date', 'Staff', 'Minutes', 'Rate', 'Cost'].map(h => (
+                            <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#6b7280', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeLog.map(entry => (
+                          <tr key={entry.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '8px 10px', fontSize: '12px', color: '#374151' }}>{formatDateTime(entry.created_at)}</td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px', fontWeight: '700', color: '#374151' }}>{entry.initials}</td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px', color: '#374151' }}>{entry.minutes}m</td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px', color: '#374151' }}>${parseFloat(entry.hourly_rate).toFixed(2)}/hr</td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px', fontWeight: '600', color: '#1a56a0' }}>${parseFloat(entry.cost).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{ display: 'flex', gap: '24px', padding: '10px 12px', backgroundColor: '#eff6ff', borderRadius: '6px', fontSize: '13px' }}>
+                      <div><span style={{ color: '#6b7280' }}>Total Time: </span><strong style={{ color: '#1a56a0' }}>{(totalTimeMinutes / 60).toFixed(1)} hrs ({totalTimeMinutes} min)</strong></div>
+                      <div><span style={{ color: '#6b7280' }}>Total Cost: </span><strong style={{ color: '#1a56a0' }}>${totalTimeCost.toFixed(2)}</strong></div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -1031,18 +784,14 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                     <div style={styles.fieldRow}>
                       <div style={styles.fieldLabel}>Email</div>
                       <div style={styles.fieldValue}>
-                        {caseData.submitter_email
-                          ? <a href={`mailto:${caseData.submitter_email}`} style={{ color: '#1a56a0' }}>{caseData.submitter_email}</a>
-                          : '—'}
+                        {caseData.submitter_email ? <a href={`mailto:${caseData.submitter_email}`} style={{ color: '#1a56a0' }}>{caseData.submitter_email}</a> : '—'}
                       </div>
                     </div>
                     <hr style={styles.divider} />
                     <div style={styles.fieldRow}>
                       <div style={styles.fieldLabel}>Phone</div>
                       <div style={styles.fieldValue}>
-                        {caseData.submitter_phone
-                          ? <a href={`tel:${caseData.submitter_phone}`} style={{ color: '#1a56a0' }}>{caseData.submitter_phone}</a>
-                          : '—'}
+                        {caseData.submitter_phone ? <a href={`tel:${caseData.submitter_phone}`} style={{ color: '#1a56a0' }}>{caseData.submitter_phone}</a> : '—'}
                       </div>
                     </div>
                   </div>
@@ -1171,10 +920,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 {isAdmin && caseData.issue_types && ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding'].includes(caseData.issue_types.name) && (
-                  <button
-                    style={{ ...styles.printBtn, width: '100%', marginBottom: '8px', fontSize: '12px' }}
-                    onClick={handleGeocode}
-                  >
+                  <button style={{ ...styles.printBtn, width: '100%', marginBottom: '8px', fontSize: '12px' }} onClick={handleGeocode}>
                     📍 {caseData.latitude ? 'Re-Geocode Location' : 'Geocode Location'}
                   </button>
                 )}
@@ -1201,11 +947,7 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
                 <div style={{ ...styles.fieldLabel, marginBottom: '4px' }}>Follow-up Due Date</div>
                 <div style={styles.inputHint}>Clear this date to remove from follow-up tracking</div>
                 <input type="date" style={styles.input} value={followupDate} onChange={e => setFollowupDate(e.target.value)} />
-                <button
-                  style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn}
-                  onClick={handleSaveDeptStatus}
-                  disabled={savingDeptStatus}
-                >
+                <button style={savingDeptStatus ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveDeptStatus} disabled={savingDeptStatus}>
                   {savingDeptStatus ? 'Saving...' : 'Update My Status'}
                 </button>
               </div>
