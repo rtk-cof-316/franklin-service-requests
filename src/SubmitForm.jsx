@@ -278,6 +278,7 @@ function SubmitForm() {
     e.preventDefault()
     setLoading(true)
 
+    // Generate case number
     const currentYear = new Date().getFullYear().toString().slice(-2)
     const { data: existingCases } = await supabase
       .from('cases')
@@ -299,25 +300,24 @@ function SubmitForm() {
       .eq('name', 'Received')
       .single()
 
+    // Insert case
     const { data: newCase, error } = await supabase
       .from('cases')
-      .insert([
-        {
-          case_number: newCaseNumber,
-          sequence_number: nextSequence,
-          year: parseInt(currentYear),
-          date_submitted: new Date().toISOString(),
-          location: formData.location,
-          description: formData.description,
-          issue_type_id: formData.issue_type_id || null,
-          is_91a: formData.is_91a,
-          submitter_name: formData.submitter_name,
-          submitter_email: formData.submitter_email,
-          submitter_phone: formData.submitter_phone,
-          status_id: statusData?.id || null,
-          created_at: new Date().toISOString(),
-        },
-      ])
+      .insert([{
+        case_number: newCaseNumber,
+        sequence_number: nextSequence,
+        year: parseInt(currentYear),
+        date_submitted: new Date().toISOString(),
+        location: formData.location,
+        description: formData.description,
+        issue_type_id: formData.issue_type_id || null,
+        is_91a: formData.is_91a,
+        submitter_name: formData.submitter_name,
+        submitter_email: formData.submitter_email,
+        submitter_phone: formData.submitter_phone,
+        status_id: statusData?.id || null,
+        created_at: new Date().toISOString(),
+      }])
       .select()
       .single()
 
@@ -327,59 +327,66 @@ function SubmitForm() {
       return
     }
 
-
-// Geocode road issue types automatically
-const roadIssueTypes = ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding']
-const selectedIssueType = issueTypes.find(t => t.id === parseInt(formData.issue_type_id))
-if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && formData.location && newCase) {
-  try {
-    const geoQuery = `${formData.location}, Franklin, NH 03235`
-    const geoRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geoQuery)}&limit=1&countrycodes=us`,
-      { headers: { 'User-Agent': 'CityOfFranklinNH-ServiceRequests/1.0' } }
-    )
-    const geoData = await geoRes.json()
-    if (geoData && geoData.length > 0) {
-      await supabase.from('cases').update({
-        latitude: parseFloat(geoData[0].lat),
-        longitude: parseFloat(geoData[0].lon),
-      }).eq('id', newCase.id)
+    // Auto-geocode road issue types
+    const roadIssueTypes = ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding']
+    const selectedIssueType = issueTypes.find(t => t.id === parseInt(formData.issue_type_id))
+    if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && formData.location && newCase) {
+      try {
+        const geoQuery = `${formData.location}, Franklin, NH 03235`
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geoQuery)}&limit=1&countrycodes=us`,
+          { headers: { 'User-Agent': 'CityOfFranklinNH-ServiceRequests/1.0' } }
+        )
+        const geoData = await geoRes.json()
+        if (geoData && geoData.length > 0) {
+          await supabase.from('cases').update({
+            latitude: parseFloat(geoData[0].lat),
+            longitude: parseFloat(geoData[0].lon),
+          }).eq('id', newCase.id)
+        }
+      } catch (geoError) {
+        console.error('Geocoding error:', geoError)
+      }
     }
-  } catch (geoError) {
-    console.error('Geocoding error:', geoError)
-  }
-}
 
+    // Create 91-A details record if needed
     if (formData.is_91a && newCase) {
-  await supabase.from('details_91a').insert([{ case_id: newCase.id }])
-
-  // Auto-assign requestor ID
-  if (formData.submitter_name) {
-    const { data: existing } = await supabase
-      .from('requestor_registry')
-      .select('requestor_id')
-      .ilike('requestor_name', formData.submitter_name.trim())
-      .single()
-
-    if (existing) {
-      await supabase.from('cases').update({ requestor_id: existing.requestor_id }).eq('id', newCase.id)
-    } else {
-      // Create new RID
-      const { data: allRids } = await supabase
-        .from('requestor_registry')
-        .select('requestor_id')
-        .order('requestor_id', { ascending: false })
-        .limit(1)
-      const lastNum = allRids?.[0]?.requestor_id ? parseInt(allRids[0].requestor_id.replace('RID', '')) : 0
-      const newRid = `RID${String(lastNum + 1).padStart(4, '0')}`
-      await supabase.from('requestor_registry').insert([{ requestor_name: formData.submitter_name.trim(), requestor_id: newRid }])
-      await supabase.from('cases').update({ requestor_id: newRid }).eq('id', newCase.id)
+      await supabase.from('details_91a').insert([{ case_id: newCase.id }])
     }
-  } else {
-    // Anonymous — assign RID0050
-    await supabase.from('cases').update({ requestor_id: 'RID0050' }).eq('id', newCase.id)
-  }
-}
+
+    // Auto-assign requestor ID for ALL cases
+    if (newCase) {
+      if (formData.submitter_name && formData.submitter_name.trim()) {
+        const { data: existing } = await supabase
+          .from('requestor_registry')
+          .select('requestor_id')
+          .ilike('requestor_name', formData.submitter_name.trim())
+          .single()
+
+        if (existing) {
+          await supabase.from('cases').update({ requestor_id: existing.requestor_id }).eq('id', newCase.id)
+        } else {
+          // Create new RID
+          const { data: allRids } = await supabase
+            .from('requestor_registry')
+            .select('requestor_id')
+            .order('requestor_id', { ascending: false })
+            .limit(1)
+          const lastNum = allRids?.[0]?.requestor_id
+            ? parseInt(allRids[0].requestor_id.replace('RID', ''))
+            : 0
+          const newRid = `RID${String(lastNum + 1).padStart(4, '0')}`
+          await supabase.from('requestor_registry').insert([{
+            requestor_name: formData.submitter_name.trim(),
+            requestor_id: newRid,
+          }])
+          await supabase.from('cases').update({ requestor_id: newRid }).eq('id', newCase.id)
+        }
+      } else {
+        // Anonymous — assign RID0050
+        await supabase.from('cases').update({ requestor_id: 'RID0050' }).eq('id', newCase.id)
+      }
+    }
 
     // Send confirmation email if email was provided
     if (formData.submitter_email) {
@@ -402,7 +409,6 @@ if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && form
         )
       } catch (emailError) {
         console.error('Email error:', emailError)
-        // Don't block submission if email fails
       }
     }
 
@@ -437,20 +443,20 @@ if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && form
               A confirmation email will be sent if you provided an email address.
             </p>
             <div style={{ marginTop: '20px', textAlign: 'left', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
-  <div style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
-    📎 Attach Photos or Files (Optional)
-  </div>
-  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-    You can attach photos or documents to help describe your request.
-  </div>
-  {newCaseId && (
-    <CaseFiles
-      caseId={newCaseId}
-      canUpload={true}
-      uploadedBy="Public Submitter"
-    />
-  )}
-</div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
+                📎 Attach Photos or Files (Optional)
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+                You can attach photos or documents to help describe your request.
+              </div>
+              {newCaseId && (
+                <CaseFiles
+                  caseId={newCaseId}
+                  canUpload={true}
+                  uploadedBy="Public Submitter"
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -578,7 +584,6 @@ if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && form
             <span style={styles.labelHint}>
               This information will be visible on the public case tracker.
             </span>
-            
             <textarea
               name="description"
               value={formData.description}
@@ -592,9 +597,11 @@ if (selectedIssueType && roadIssueTypes.includes(selectedIssueType.name) && form
               }
             />
           </div>
-<div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '13px', color: '#1e40af', lineHeight: '1.6' }}>
-  📎 <strong>Want to attach a photo or file?</strong> After submitting you'll have the option to upload photos or documents to support your request.
-</div>
+
+          <div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '13px', color: '#1e40af', lineHeight: '1.6' }}>
+            📎 <strong>Want to attach a photo or file?</strong> After submitting you'll have the option to upload photos or documents to support your request.
+          </div>
+
           <button
             onClick={handleSubmit}
             disabled={loading}

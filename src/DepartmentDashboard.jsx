@@ -551,7 +551,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         )}
       </div>
 
-      {/* Password change */}
+    
       {/* Password change */}
 <div style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
   <span style={{ fontSize: '13px', color: '#6b7280' }}>Need to update your login credentials?</span>
