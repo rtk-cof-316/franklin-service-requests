@@ -128,6 +128,12 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [savingRtk, setSavingRtk] = useState(false)
   const [rtkSuccess, setRtkSuccess] = useState(false)
 
+  // Archive checklist
+const [archiveNetworkFolder, setArchiveNetworkFolder] = useState(false)
+const [archiveInitialExport, setArchiveInitialExport] = useState(false)
+const [archiveClosedExport, setArchiveClosedExport] = useState(false)
+const [savingArchive, setSavingArchive] = useState(false)
+
   // Time log state
   const [timeLog, setTimeLog] = useState([])
   const [timeMinutes, setTimeMinutes] = useState('')
@@ -158,6 +164,9 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
       setSelectedIssueType(data.issue_types?.id || '')
       setFollowupDate(data.followup_due_date ? data.followup_due_date.slice(0, 10) : '')
       setIs91a(data.is_91a || false)
+      setArchiveNetworkFolder(data.archive_network_folder || false)
+      setArchiveInitialExport(data.archive_initial_export || false)
+      setArchiveClosedExport(data.archive_closed_export || false)
       setSubmitterName(data.submitter_name || '')
       setSubmitterEmail(data.submitter_email || '')
       setSubmitterPhone(data.submitter_phone || '')
@@ -442,6 +451,14 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
     await loadCase()
     await loadAuditLog()
     setAddingDept(false)
+  }
+
+async function handleArchiveCheckbox(field, value, label) {
+    setSavingArchive(true)
+    await supabase.from('cases').update({ [field]: value }).eq('id', caseId)
+    await logAudit(caseId, `${label} ${value ? 'checked' : 'unchecked'}`, userEmail)
+    await loadAuditLog()
+    setSavingArchive(false)
   }
 
   async function handleGeocode() {
@@ -927,6 +944,41 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
               </div>
             </div>
           )}
+
+{/* Archive Checklist — admin only */}
+{isAdmin && (
+  <div style={styles.card}>
+    <div style={styles.cardHeader}>
+      <span style={styles.cardTitle}>📁 Archive Checklist</span>
+      {savingArchive && <span style={{ fontSize: '11px', color: '#9ca3af' }}>Saving...</span>}
+    </div>
+    <div style={styles.cardBody}>
+      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+        Track case file archiving steps.
+      </div>
+      {[
+        { field: 'archive_network_folder', value: archiveNetworkFolder, setter: setArchiveNetworkFolder, label: 'Network Folder Created' },
+        { field: 'archive_initial_export', value: archiveInitialExport, setter: setArchiveInitialExport, label: 'Initial Export Complete' },
+        { field: 'archive_closed_export', value: archiveClosedExport, setter: setArchiveClosedExport, label: 'Closed Export Complete' },
+      ].map(({ field, value, setter, label }) => (
+        <div key={field} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
+          <input
+            type="checkbox"
+            checked={value}
+            onChange={async e => {
+              setter(e.target.checked)
+              await handleArchiveCheckbox(field, e.target.checked, label)
+            }}
+            style={{ accentColor: '#1a56a0', width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0 }}
+          />
+          <span style={{ fontSize: '13px', color: value ? '#065f46' : '#374151', fontWeight: value ? '600' : '400', textDecoration: value ? 'none' : 'none' }}>
+            {value ? '✓ ' : ''}{label}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
           {/* Dept user status panel */}
           {!isAdmin && myDeptAssignment && (

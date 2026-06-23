@@ -57,7 +57,7 @@ function App() {
         setUserRole(null)
         setUserDepartmentId(null)
         setViewingCaseId(null)
-      }, 5 * 60 * 1000)
+      }, 10 * 60 * 1000)
     }
 
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']

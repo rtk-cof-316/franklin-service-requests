@@ -201,6 +201,18 @@ const styles = {
     marginRight: '4px',
     marginBottom: '2px',
   },
+  deptTagClosed: {
+    display: 'inline-block',
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    border: '1px solid #6ee7b7',
+    borderRadius: '4px',
+    padding: '2px 6px',
+    fontSize: '11px',
+    marginRight: '4px',
+    marginBottom: '2px',
+    fontWeight: '600',
+  },
   viewBtn: {
     padding: '4px 12px',
     backgroundColor: '#1a56a0',
@@ -434,11 +446,17 @@ function AdminDashboard({ onViewCase, refreshKey }) {
                   </td>
                   <td style={styles.td}>
                     {c.case_departments?.length > 0
-                      ? c.case_departments.map((cd, i) => (
-                          <span key={i} style={styles.deptTag}>{cd.departments?.name}</span>
-                        ))
-                      : <span style={{ color: '#9ca3af', fontSize: '12px' }}>Unassigned</span>
-                    }
+  ? c.case_departments.map((cd, i) => {
+      const deptStatusName = (cd.statuses?.name || '').toLowerCase()
+      const isClosed = closedStatuses.includes(deptStatusName)
+      return (
+        <span key={i} style={isClosed ? styles.deptTagClosed : styles.deptTag}>
+          {cd.departments?.name}{isClosed ? ' ✓' : ''}
+        </span>
+      )
+    })
+  : <span style={{ color: '#9ca3af', fontSize: '12px' }}>Unassigned</span>
+}
                   </td>
                   <td style={styles.td}>
                     <button style={styles.viewBtn} onClick={() => onViewCase && onViewCase(c.id)}>
