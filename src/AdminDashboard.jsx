@@ -368,7 +368,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
               return (
                 <div key={c.id} style={styles.alertRow}>
                   <span style={styles.alertCaseNum} onClick={() => onViewCase && onViewCase(c.id)}>#{c.case_number}</span>
-                  // Preventing text overflow in the location column
+                  {/*Preventing text overflow in the location column*/} 
                   <span style={{ ...styles.alertLocation, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{c.location || c.description?.slice(0, 40)}</span>
                   <span style={days <= 0 ? styles.alertDate : days <= 3 ? styles.alertDate : styles.alertDateSoon}>
                     {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`}
@@ -438,7 +438,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
                     {c.is_91a && <span style={styles.tag91a}>91-A</span>}
                   </td>
                   <td style={styles.td}>{formatDate(c.date_submitted)}</td>
-                  // Preventing text overflow in the location and issue type columns
+                  {/* Preventing text overflow in the location and issue type columns*/}
                   <td style={{ ...styles.td, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.location || '—'}</td>
                   <td style={{ ...styles.td, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.issue_types?.name || '—'}</td>
                   <td style={styles.td}>
