@@ -278,6 +278,16 @@ function SubmitForm() {
     e.preventDefault()
     setLoading(true)
 
+    // Validate email format if provided
+    if (formData.submitter_email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(formData.submitter_email.trim())) {
+        alert('Please enter a valid email address or leave the field blank.')
+        setLoading(false)
+        return
+      }
+    }
+
     // Generate case number
     const currentYear = new Date().getFullYear().toString().slice(-2)
     const { data: existingCases } = await supabase
@@ -313,7 +323,7 @@ function SubmitForm() {
         issue_type_id: formData.issue_type_id || null,
         is_91a: formData.is_91a,
         submitter_name: formData.submitter_name,
-        submitter_email: formData.submitter_email,
+        submitter_email: formData.submitter_email?.trim() || null,
         submitter_phone: formData.submitter_phone,
         status_id: statusData?.id || null,
         created_at: new Date().toISOString(),
@@ -551,6 +561,8 @@ function SubmitForm() {
               value={formData.location}
               onChange={handleChange}
               required={!formData.is_91a}
+              
+              style={{ ...styles.input, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
               maxLength={100}
               style={styles.input}
               placeholder={
