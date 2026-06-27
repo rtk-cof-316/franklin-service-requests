@@ -258,12 +258,20 @@ const [savingArchive, setSavingArchive] = useState(false)
     const newIssueType = issueTypes.find(t => t.id === parseInt(selectedIssueType))?.name
     const old91a = caseData.is_91a
 
-    const { error } = await supabase.from('cases').update({
+    const closingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
+    const isClosing = newStatus && closingStatuses.includes(newStatus.toLowerCase())
+    const isReopening = oldStatus && closingStatuses.includes(oldStatus.toLowerCase()) && !isClosing
+
+    const updatePayload = {
       status_id: selectedStatus || null,
       issue_type_id: selectedIssueType || null,
       followup_due_date: followupDate || null,
       is_91a: is91a,
-    }).eq('id', caseId).select()
+    }
+    if (isClosing) updatePayload.closed_date = new Date().toISOString()
+    if (isReopening) updatePayload.closed_date = null
+
+    const { error } = await supabase.from('cases').update(updatePayload).eq('id', caseId).select()
 
     if (!error) {
       if (newStatus && newStatus !== oldStatus) {

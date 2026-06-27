@@ -551,11 +551,12 @@ function SubmitForm() {
               value={formData.location}
               onChange={handleChange}
               required={!formData.is_91a}
+              maxLength={100}
               style={styles.input}
               placeholder={
                 formData.is_91a
                   ? 'Brief subject of your records request'
-                  : 'Street address or nearest intersection'
+                  : 'e.g. 271 Central St or Central St & Bow St'
               }
             />
           </div>
