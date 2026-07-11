@@ -795,6 +795,12 @@ async function handleArchiveCheckbox(field, value, label) {
                         <strong>Requestor ID:</strong> {caseData.requestor_id}
                       </div>
                     )}
+                    <div style={{ fontSize: '12px', marginBottom: '10px' }}>
+  {caseData.policy_acknowledged
+    ? <span style={{ color: '#065f46', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>✓ Policy acknowledged at submission</span>
+    : <span style={{ color: '#92400e', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '4px', fontWeight: '600' }}>⚠ Policy not acknowledged (pre-policy submission)</span>
+  }
+</div>
                     <button style={savingSubmitter ? styles.saveBtnDisabled : styles.saveBtn} onClick={handleSaveSubmitter} disabled={savingSubmitter}>
                       {savingSubmitter ? 'Saving...' : 'Save Submitter Info'}
                     </button>
