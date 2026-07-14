@@ -19,6 +19,32 @@ const styles = {
     color: '#6b7280',
     margin: '0 0 24px 0',
   },
+  urgentBanner: {
+    backgroundColor: '#fee2e2',
+    border: '2px solid #dc2626',
+    borderRadius: '8px',
+    padding: '16px 20px',
+    marginBottom: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  urgentIcon: {
+    fontSize: '28px',
+    flexShrink: 0,
+  },
+  urgentText: {
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#991b1b',
+    lineHeight: '1.4',
+  },
+  urgentSub: {
+    fontSize: '13px',
+    color: '#b91c1c',
+    marginTop: '2px',
+    fontWeight: '400',
+  },
   cardsRow: {
     display: 'flex',
     gap: '16px',
@@ -269,6 +295,11 @@ function daysUntil(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
+function daysSince(dateStr) {
+  if (!dateStr) return 0
+  return Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
+}
+
 const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
 
 function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint }) {
@@ -278,6 +309,8 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   const [statusFilter, setStatusFilter] = useState('open')
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
+  const [urgentCount, setUrgentCount] = useState(0)
+  const [urgentCaseIds, setUrgentCaseIds] = useState(new Set())
 
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -296,11 +329,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   }, [statusFilter, search])
 
   async function loadDepartmentName() {
-    const { data } = await supabase
-      .from('departments')
-      .select('name')
-      .eq('id', departmentId)
-      .single()
+    const { data } = await supabase.from('departments').select('name').eq('id', departmentId).single()
     if (data) setDepartmentName(data.name)
   }
 
@@ -319,34 +348,43 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     }
 
     const caseIds = caseDepts.map(cd => cd.case_id)
-
     const deptStatusMap = {}
-    caseDepts.forEach(cd => {
-      deptStatusMap[cd.case_id] = cd.statuses?.name || null
-    })
+    caseDepts.forEach(cd => { deptStatusMap[cd.case_id] = cd.statuses?.name || null })
 
     const { data, error } = await supabase
       .from('cases')
-      .select(`
-        id,
-        case_number,
-        date_submitted,
-        location,
-        description,
-        is_91a,
-        followup_due_date,
-        closed_date,
-        issue_types ( name )
-      `)
+      .select(`id, case_number, date_submitted, location, description, is_91a, followup_due_date, closed_date, issue_types ( name )`)
       .in('id', caseIds)
       .order('date_submitted', { ascending: false })
 
     if (!error) {
-      const enriched = (data || []).map(c => ({
-        ...c,
-        dept_status: deptStatusMap[c.id] || null,
-      }))
+      const enriched = (data || []).map(c => ({ ...c, dept_status: deptStatusMap[c.id] || null }))
       setCases(enriched)
+
+      // Calculate urgent cases — open with no public comment for 7+ days
+      const openCaseIds = enriched
+        .filter(c => !closedStatuses.includes((c.dept_status || '').toLowerCase()))
+        .map(c => c.id)
+
+      if (openCaseIds.length > 0) {
+        const { data: comments } = await supabase
+          .from('case_comments')
+          .select('case_id')
+          .in('case_id', openCaseIds)
+
+        const casesWithComments = new Set(comments?.map(c => c.case_id) || [])
+        const urgentCases = enriched.filter(c => {
+          const isOpen = !closedStatuses.includes((c.dept_status || '').toLowerCase())
+          const hasNoComment = !casesWithComments.has(c.id)
+          const daysOpen = daysSince(c.date_submitted)
+          return isOpen && hasNoComment && daysOpen >= 7
+        })
+        setUrgentCount(urgentCases.length)
+        setUrgentCaseIds(new Set(urgentCases.map(c => c.id)))
+      } else {
+        setUrgentCount(0)
+        setUrgentCaseIds(new Set())
+      }
     }
     setLoading(false)
   }
@@ -378,6 +416,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     const isOpen = !closedStatuses.includes(deptStatus)
     if (statusFilter === 'open' && !isOpen) return false
     if (statusFilter === 'closed' && isOpen) return false
+    if (statusFilter === 'urgent' && !urgentCaseIds.has(c.id)) return false
     if (search.trim()) {
       const s = search.toLowerCase()
       return (
@@ -389,31 +428,22 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     return true
   })
 
-  const openCases = cases.filter(c => {
-    const deptStatus = (c.dept_status || '').toLowerCase()
-    return !closedStatuses.includes(deptStatus)
-  })
+  const openCases = cases.filter(c => !closedStatuses.includes((c.dept_status || '').toLowerCase()))
 
   const upcomingFollowups = cases.filter(c => {
     if (!c.followup_due_date) return false
     const days = daysUntil(c.followup_due_date)
-    const deptStatus = (c.dept_status || '').toLowerCase()
-    const isOpen = !closedStatuses.includes(deptStatus)
+    const isOpen = !closedStatuses.includes((c.dept_status || '').toLowerCase())
     return isOpen && days !== null && days >= -999 && days <= 10
   }).sort((a, b) => new Date(a.followup_due_date) - new Date(b.followup_due_date))
 
   function toggleSelect(id) {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   function toggleSelectAll() {
-    if (selectedIds.length === filteredCases.length) {
-      setSelectedIds([])
-    } else {
-      setSelectedIds(filteredCases.map(c => c.id))
-    }
+    if (selectedIds.length === filteredCases.length) setSelectedIds([])
+    else setSelectedIds(filteredCases.map(c => c.id))
   }
 
   return (
@@ -421,19 +451,32 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
       <h1 style={styles.pageTitle}>{departmentName} Dashboard</h1>
       <p style={styles.pageSub}>Showing cases assigned to your department only</p>
 
+      {/* Urgent alert banner */}
+      {urgentCount > 0 && (
+        <div style={styles.urgentBanner}>
+          <div style={styles.urgentIcon}>🚨</div>
+          <div>
+            <div style={styles.urgentText}>
+              {urgentCount} open case{urgentCount !== 1 ? 's have' : ' has'} not received a public update in over 7 days.
+            </div>
+            <div style={styles.urgentSub}>
+              Please open these cases and post a public update so residents can see that work is in progress. Use the "Needs Public Update" filter to find them quickly.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.cardsRow}>
         <div style={styles.scoreCard}>
           <div style={styles.scoreCardLabel}>Open Cases</div>
           <div style={styles.scoreCardValue}>{openCases.length}</div>
           <div style={styles.scoreCardSub}>Your department's active cases</div>
         </div>
-
         <div style={styles.scoreCard}>
           <div style={styles.scoreCardLabel}>Total Cases</div>
           <div style={styles.scoreCardValue}>{cases.length}</div>
           <div style={styles.scoreCardSub}>All time</div>
         </div>
-
         <div style={styles.alertCard}>
           <div style={styles.alertCardLabel}>Follow-ups Due in Next 10 Days</div>
           {upcomingFollowups.length === 0 ? (
@@ -457,7 +500,14 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
-          <div style={styles.tableTitle}>My Cases</div>
+          <div>
+            <div style={styles.tableTitle}>My Cases</div>
+            {statusFilter === 'urgent' && urgentCaseIds.size > 0 && (
+              <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '2px', fontWeight: '600' }}>
+                Showing {urgentCaseIds.size} case{urgentCaseIds.size !== 1 ? 's' : ''} needing a public update
+              </div>
+            )}
+          </div>
           <div style={styles.filterRow}>
             <input
               type="text"
@@ -466,12 +516,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
               onChange={e => setSearch(e.target.value)}
               style={styles.filterInput}
             />
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              style={styles.filterSelect}
-            >
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={styles.filterSelect}>
               <option value="open">Open Cases</option>
+              <option value="urgent">⚠️ Needs Public Update ({urgentCount})</option>
               <option value="closed">Closed Cases</option>
               <option value="all">All Cases</option>
             </select>
@@ -481,19 +528,17 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         {selectedIds.length > 0 && (
           <div style={styles.bulkBar}>
             <span>{selectedIds.length} case{selectedIds.length !== 1 ? 's' : ''} selected</span>
-            <button style={styles.bulkPrintBtn} onClick={() => onBulkPrint && onBulkPrint(selectedIds)}>
-              Print Work Orders
-            </button>
-            <button style={styles.clearBtn} onClick={() => setSelectedIds([])}>
-              Clear
-            </button>
+            <button style={styles.bulkPrintBtn} onClick={() => onBulkPrint && onBulkPrint(selectedIds)}>Print Work Orders</button>
+            <button style={styles.clearBtn} onClick={() => setSelectedIds([])}>Clear</button>
           </div>
         )}
 
         {loading ? (
           <div style={styles.loading}>Loading cases...</div>
         ) : filteredCases.length === 0 ? (
-          <div style={styles.empty}>No cases found.</div>
+          <div style={styles.empty}>
+            {statusFilter === 'urgent' ? 'No cases need a public update right now. Great work!' : 'No cases found.'}
+          </div>
         ) : (
           <table style={styles.table}>
             <thead>
@@ -516,7 +561,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
             </thead>
             <tbody>
               {filteredCases.map(c => (
-                <tr key={c.id} style={{ backgroundColor: selectedIds.includes(c.id) ? '#f0f7ff' : 'transparent' }}>
+                <tr key={c.id} style={{ backgroundColor: selectedIds.includes(c.id) ? '#f0f7ff' : urgentCaseIds.has(c.id) ? '#fff7f7' : 'transparent' }}>
                   <td style={styles.td}>
                     <input
                       type="checkbox"
@@ -530,6 +575,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
                       {c.case_number}
                     </span>
                     {c.is_91a && <span style={styles.tag91a}>91-A</span>}
+                    {urgentCaseIds.has(c.id) && (
+                      <span title="No public update in 7+ days — please post an update" style={{ marginLeft: '6px', fontSize: '13px' }}>💬⚠️</span>
+                    )}
                   </td>
                   <td style={styles.td}>{formatDate(c.date_submitted)}</td>
                   <td style={styles.td}>{c.location || '—'}</td>
@@ -551,17 +599,16 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         )}
       </div>
 
-    
       {/* Password change */}
-<div style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-  <span style={{ fontSize: '13px', color: '#6b7280' }}>Need to update your login credentials?</span>
-  <button
-    onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMsg(null) }}
-    style={{ padding: '6px 14px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#374151', fontSize: '13px', fontWeight: '600', borderRadius: '6px', cursor: 'pointer' }}
-  >
-    Change My Password
-  </button>
-</div>
+      <div style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '13px', color: '#6b7280' }}>Need to update your login credentials?</span>
+        <button
+          onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMsg(null) }}
+          style={{ padding: '6px 14px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#374151', fontSize: '13px', fontWeight: '600', borderRadius: '6px', cursor: 'pointer' }}
+        >
+          Change My Password
+        </button>
+      </div>
 
       {showPasswordForm && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginTop: '8px', maxWidth: '400px', marginLeft: 'auto' }}>
