@@ -11,6 +11,12 @@ import PrintCaseDetail from './PrintCaseDetail'
 import PrintMultipleWorkOrders from './PrintMultipleWorkOrders'
 import RoadWatch from './RoadWatch'
 import PublicAnalytics from './PublicAnalytics'
+import PublicInput from './PublicInput'
+import PublicInputTopic from './PublicInputTopic'
+import PrintPublicInputTopic from './PrintPublicInputTopic'
+import PublicInputSubmit from './PublicInputSubmit'
+import AdminTopics from './AdminTopics'
+import AdminModeration from './AdminModeration'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -24,6 +30,7 @@ function App() {
   const [previousPage, setPreviousPage] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [bulkPrintIds, setBulkPrintIds] = useState([])
+  const [viewingTopicId, setViewingTopicId] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -127,7 +134,27 @@ function App() {
     setPage('print-bulk-work-orders')
   }
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders'].includes(page)
+  function handleViewTopic(topicId) {
+    setViewingTopicId(topicId)
+    setPage('public-input-detail')
+  }
+
+  function handleSubmitTopic(topicId) {
+    setViewingTopicId(topicId)
+    setPage('public-input-submit')
+  }
+
+  function handleBackFromPublicInput() {
+    setViewingTopicId(null)
+    setPage('public-input')
+  }
+
+  function handlePrintPublicInputTopic(topicId) {
+    setViewingTopicId(topicId)
+    setPage('print-public-input-analysis')
+  }
+
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis'].includes(page)
 
   const navBtn = (target, label) => (
     <button
@@ -137,7 +164,9 @@ function App() {
         border: 'none',
         color: (page === target ||
           (target === 'admin' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin') ||
-          (target === 'department' && ['case-detail', 'print-work-order'].includes(page) && previousPage === 'department')
+          (target === 'department' && ['case-detail', 'print-work-order'].includes(page) && previousPage === 'department') ||
+          (target === 'admin-public-topics' && page === 'admin-public-moderation') ||
+          (target === 'public-input' && ['public-input-detail', 'public-input-submit'].includes(page))
         ) ? '#ffffff' : '#93afd4',
         cursor: 'pointer',
         fontSize: '14px',
@@ -156,7 +185,9 @@ function App() {
           {navBtn('track', 'Check Status')}
           {navBtn('roads', 'Road Watch')}
           {navBtn('analytics', 'City Analytics')}
+          {navBtn('public-input', 'Public Comment')}
           {session && userRole === 'admin' && navBtn('admin', 'Admin')}
+          {session && userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
           {session && userRole === 'department' && navBtn('department', 'My Cases')}
           <div style={{ marginLeft: 'auto' }}>
             {session ? (
@@ -176,10 +207,33 @@ function App() {
       {page === 'track' && <CaseTracker />}
       {page === 'roads' && <RoadWatch />}
       {page === 'analytics' && <PublicAnalytics />}
+      {page === 'public-input' && (
+        <PublicInput onViewTopic={handleViewTopic} onSubmitTopic={handleSubmitTopic} />
+      )}
+      {page === 'public-input-detail' && viewingTopicId && (
+        <PublicInputTopic
+          topicId={viewingTopicId}
+          onBack={handleBackFromPublicInput}
+          onSubmit={handleSubmitTopic}
+          onPrint={handlePrintPublicInputTopic}
+        />
+      )}
+      {page === 'print-public-input-analysis' && viewingTopicId && (
+        <PrintPublicInputTopic topicId={viewingTopicId} onClose={() => setPage('public-input-detail')} />
+      )}
+      {page === 'public-input-submit' && viewingTopicId && (
+        <PublicInputSubmit
+          topicId={viewingTopicId}
+          onBack={() => setPage('public-input-detail')}
+          onSubmitted={() => setPage('public-input-detail')}
+        />
+      )}
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (
         <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} />
       )}
+      {page === 'admin-public-topics' && session && userRole === 'admin' && <AdminTopics />}
+      {page === 'admin-public-moderation' && session && userRole === 'admin' && <AdminModeration />}
       {page === 'department' && session && userRole === 'department' && (
         <DepartmentDashboard
           departmentId={userDepartmentId}

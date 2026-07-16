@@ -93,6 +93,84 @@ Deno.serve(async (req) => {
     })
   }
 
+  // ─── Public Comment Pending Notification ──────────────────────────
+  if (body.type === 'public_comment_pending') {
+    const { topicTitle, commentId } = body
+
+    const profilesRes = await fetch(
+      `${supabaseUrl}/rest/v1/user_profiles?role=eq.admin&select=user_id`,
+      { headers: { 'apikey': serviceRoleKey, 'Authorization': `Bearer ${serviceRoleKey}` } }
+    )
+    const profiles = await profilesRes.json()
+
+    if (!profiles || profiles.length === 0) {
+      return new Response(JSON.stringify({ success: true, message: 'No admin users found' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const emails = []
+    for (const profile of profiles) {
+      const userRes = await fetch(
+        `${supabaseUrl}/auth/v1/admin/users/${profile.user_id}`,
+        { headers: { 'apikey': serviceRoleKey, 'Authorization': `Bearer ${serviceRoleKey}` } }
+      )
+      const user = await userRes.json()
+      if (user?.email) emails.push(user.email)
+    }
+
+    if (emails.length === 0) {
+      return new Response(JSON.stringify({ success: true, message: 'No emails found' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const results = []
+    for (const email of emails) {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+          to: [{ email }],
+          subject: `New Public Comment Awaiting Review — ${topicTitle}`,
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #1a56a0; padding: 24px 32px;">
+                <h1 style="color: #e8eef6; margin: 0; font-size: 20px;">City of Franklin, NH</h1>
+                <p style="color: #93afd4; margin: 4px 0 0 0; font-size: 13px;">Public Comment Notification</p>
+              </div>
+              <div style="padding: 32px; border: 1px solid #e5e7eb;">
+                <p style="font-size: 15px; color: #111827;">A new public comment has been submitted and is awaiting your review.</p>
+                <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 16px; margin: 20px 0;">
+                  <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px;">Topic</div>
+                  <div style="font-size: 18px; font-weight: 700; color: #1a56a0;">${topicTitle}</div>
+                </div>
+                <div style="margin: 24px 0;">
+                  <a href="https://franklin-service-requests-39a5.vercel.app/?page=admin-public-moderation" style="background-color: #1a56a0; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                    Review in Moderation Queue
+                  </a>
+                </div>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                  <strong>Please do not reply to this email.</strong> This is an automated notification. Log in to the staff portal to approve or reject this comment.
+                </div>
+              </div>
+              <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
+                City of Franklin, New Hampshire &nbsp;|&nbsp; Public Comment Module &nbsp;|&nbsp; Comment ID: ${commentId}
+              </div>
+            </div>
+          `,
+        }),
+      })
+      const data = await res.json()
+      results.push(data)
+    }
+    return new Response(JSON.stringify({ success: true, results }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   // ─── Department Reminder Notification ────────────────────────────
   if (body.type === 'department_reminder') {
     const { departmentId, caseNumber, location, description, departmentName, lastUpdateText } = body
