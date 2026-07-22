@@ -298,7 +298,107 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
+// Admin new case notification
+  if (body.type === 'admin_new_case') {
+    const { caseNumber, location, description, issueType, submitterName } = body
 
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'Franklin Service Request System', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: 'bdemers@franklinnh.gov' }],
+        subject: `📬 New Request Just Came In — Case #${caseNumber}`,
+        htmlContent: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #1a56a0; padding: 24px 32px;">
+              <h1 style="color: #e8eef6; margin: 0; font-size: 20px;">Hey, a new request just landed! 👋</h1>
+              <p style="color: #93afd4; margin: 4px 0 0 0; font-size: 13px;">Franklin Service Request System</p>
+            </div>
+            <div style="padding: 32px; border: 1px solid #e5e7eb;">
+              <p style="font-size: 15px; color: #111827;">No need to panic — it's just a new service request. Here's what came in:</p>
+              <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 16px; margin: 20px 0;">
+                <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px;">Case Number</div>
+                <div style="font-size: 28px; font-weight: 700; color: #1a56a0;">#${caseNumber}</div>
+              </div>
+              <p style="font-size: 14px; color: #374151;"><strong>From:</strong> ${submitterName || 'Anonymous'}</p>
+              <p style="font-size: 14px; color: #374151;"><strong>Issue Type:</strong> ${issueType || '—'}</p>
+              <p style="font-size: 14px; color: #374151;"><strong>Location:</strong> ${location || '—'}</p>
+              <p style="font-size: 14px; color: #374151;"><strong>Description:</strong> ${description}</p>
+              <p style="font-size: 13px; color: #6b7280; font-style: italic;">Take a breath — you've got this. 💙</p>
+              <div style="margin: 24px 0;">
+                <a href="https://franklin-service-requests-39a5.vercel.app" style="background-color: #1a56a0; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                  View in Admin Dashboard
+                </a>
+              </div>
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+              <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                This is an automated notification for Brenda Demers, City Manager's Office. Please do not reply to this email.
+              </div>
+            </div>
+            <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
+              City of Franklin, New Hampshire &nbsp;|&nbsp; Service Request System
+            </div>
+          </div>
+        `,
+      }),
+    })
+    const data = await res.json()
+    return new Response(JSON.stringify({ success: true, data }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Admin dept closed notification
+  if (body.type === 'admin_dept_closed') {
+    const { caseNumber, location, description, departmentName, deptStatus } = body
+
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'Franklin Service Request System', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: 'bdemers@franklinnh.gov' }],
+        subject: `✅ ${departmentName} wrapped up their part — Case #${caseNumber}`,
+        htmlContent: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #16a34a; padding: 24px 32px;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Good news! A department is done. 🎉</h1>
+              <p style="color: #bbf7d0; margin: 4px 0 0 0; font-size: 13px;">Franklin Service Request System</p>
+            </div>
+            <div style="padding: 32px; border: 1px solid #e5e7eb;">
+              <p style="font-size: 15px; color: #111827;"><strong>${departmentName}</strong> has wrapped up their portion of Case #${caseNumber} and marked it as <strong>${deptStatus}</strong>.</p>
+              <div style="background-color: #d1fae5; border: 1px solid #6ee7b7; border-radius: 6px; padding: 16px; margin: 20px 0;">
+                <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #065f46; margin-bottom: 4px;">Case Number</div>
+                <div style="font-size: 28px; font-weight: 700; color: #065f46;">#${caseNumber}</div>
+                <div style="font-size: 13px; color: #065f46; margin-top: 4px;">${departmentName} — ${deptStatus}</div>
+              </div>
+              <p style="font-size: 14px; color: #374151;"><strong>Location:</strong> ${location || '—'}</p>
+              <p style="font-size: 14px; color: #374151;"><strong>Description:</strong> ${description}</p>
+              <p style="font-size: 13px; color: #6b7280;">You may want to check if other departments assigned to this case still need to act, or if the master case status can now be updated.</p>
+              <div style="margin: 24px 0;">
+                <a href="https://franklin-service-requests-39a5.vercel.app" style="background-color: #16a34a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                  Review Case in Dashboard
+                </a>
+              </div>
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+              <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                This is an automated notification for Brenda Demers, City Manager's Office. Please do not reply to this email.
+              </div>
+            </div>
+            <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
+              City of Franklin, New Hampshire &nbsp;|&nbsp; Service Request System
+            </div>
+          </div>
+        `,
+      }),
+    })
+    const data = await res.json()
+    return new Response(JSON.stringify({ success: true, data }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  
   // ─── Original Case Confirmation Email ────────────────────────────
   const { email, caseNumber, location, description } = body
   if (!email) {

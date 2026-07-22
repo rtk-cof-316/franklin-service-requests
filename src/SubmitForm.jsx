@@ -560,6 +560,28 @@ function SubmitForm() {
       }
     }
 
+// Notify admin of new case
+    try {
+      const selectedIssueTypeName = issueTypes.find(t => t.id === parseInt(formData.issue_type_id))?.name
+      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          type: 'admin_new_case',
+          caseNumber: newCaseNumber,
+          location: formData.location,
+          description: formData.description,
+          issueType: selectedIssueTypeName || '—',
+          submitterName: formData.submitter_name || 'Anonymous',
+        }),
+      })
+    } catch (e) {
+      console.error('Admin notification error:', e)
+    }
+
     setNewCaseId(newCase.id)
     setCaseNumber(newCaseNumber)
     setSubmitted(true)

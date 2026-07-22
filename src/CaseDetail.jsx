@@ -366,6 +366,29 @@ const [savingArchive, setSavingArchive] = useState(false)
     if (auditParts.length > 0) {
       await supabase.from('case_audit_log').insert([{ case_id: caseId, action: auditParts.join(', '), performed_by: userEmail, created_at: new Date().toISOString() }])
     }
+    // Notify admin if dept marked their status as closed
+    const deptClosingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
+    if (newStatus && deptClosingStatuses.includes(newStatus.toLowerCase())) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'admin_dept_closed',
+            caseNumber: caseData.case_number,
+            location: caseData.location,
+            description: caseData.description,
+            departmentName: myDeptAssignment.departments?.name,
+            deptStatus: newStatus,
+          }),
+        })
+      } catch (e) {
+        console.error('Admin dept closed notification error:', e)
+      }
+    }
     setDeptSaveSuccess(true)
     await loadCase()
     await loadAuditLog()
