@@ -456,7 +456,7 @@ const [savingArchive, setSavingArchive] = useState(false)
   async function handleAddComment() {
     if (!newComment.trim()) return
     setSavingComment(true)
-    await supabase.from('case_comments').insert([{ case_id: caseId, comment: newComment.trim(), created_by: userEmail, created_at: new Date().toISOString() }])
+    await supabase.from('case_comments').insert([{ case_id: caseId, comment: newComment.trim(), created_by: userEmail, department_id: userDepartmentId || null, created_at: new Date().toISOString() }])
     await logAudit(caseId, `Public comment added`, userEmail)
     setNewComment('')
     await loadComments()

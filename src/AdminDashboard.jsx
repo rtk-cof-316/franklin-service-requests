@@ -339,7 +339,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
     const { data: allComments } = await supabase
       .from('case_comments')
-      .select('case_id, created_at')
+      .select('case_id, created_at, department_id')
 
     if (!caseDepts || !openCases) {
       setAccountabilityLoading(false)
@@ -355,7 +355,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     const commentsByCaseId = {}
     allComments?.forEach(c => {
       if (!commentsByCaseId[c.case_id]) commentsByCaseId[c.case_id] = []
-      commentsByCaseId[c.case_id].push(c.created_at)
+      commentsByCaseId[c.case_id].push({ created_at: c.created_at, department_id: c.department_id })
     })
 
     const deptMap = {}
@@ -368,7 +368,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       }
       deptMap[deptName].open_cases++
       const caseComments = commentsByCaseId[cd.case_id] || []
-      const hasComment = caseComments.length > 0
+      const hasComment = caseComments.some(c => c.department_id === cd.department_id)
       const caseData = openCases.find(c => c.id === cd.case_id)
       const daysOpen = daysSince(caseData?.date_submitted)
       if (!hasComment) {
