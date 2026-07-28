@@ -151,17 +151,50 @@ const styles = {
     borderRadius: '6px',
     border: '1px solid #e5e7eb',
   },
-  archiveToggle: {
-    background: 'none',
-    border: 'none',
-    color: '#1a56a0',
-    fontWeight: '600',
-    fontSize: '14px',
+  archiveCard: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    backgroundColor: '#ffffff',
+    border: '2px solid #1a56a0',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    padding: '18px 24px',
+    marginTop: '28px',
+    marginBottom: '16px',
     cursor: 'pointer',
-    padding: 0,
-    marginTop: '24px',
-    marginBottom: '12px',
-    textDecoration: 'underline',
+    textAlign: 'left',
+  },
+  archiveIcon: {
+    fontSize: '20px',
+  },
+  archiveTextWrap: {
+    flex: 1,
+  },
+  archiveTitle: {
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#1a56a0',
+  },
+  archiveHint: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '2px',
+  },
+  archiveCount: {
+    display: 'inline-block',
+    backgroundColor: '#1a56a0',
+    color: '#ffffff',
+    borderRadius: '20px',
+    padding: '2px 10px',
+    fontSize: '12px',
+    fontWeight: '700',
+  },
+  archiveChevron: {
+    fontSize: '14px',
+    color: '#1a56a0',
+    fontWeight: '700',
   },
 }
 
@@ -287,8 +320,16 @@ function PublicInput({ onViewTopic, onSubmitTopic }) {
 
         {archivedTopics.length > 0 && (
           <>
-            <button style={styles.archiveToggle} onClick={() => setShowArchive(prev => !prev)}>
-              {showArchive ? 'Hide' : 'Show'} archived topics ({archivedTopics.length})
+            <button style={styles.archiveCard} onClick={() => setShowArchive(prev => !prev)}>
+              <span style={styles.archiveIcon}>🗂️</span>
+              <span style={styles.archiveTextWrap}>
+                <div>
+                  <span style={styles.archiveTitle}>Archived Topics </span>
+                  <span style={styles.archiveCount}>{archivedTopics.length}</span>
+                </div>
+                <div style={styles.archiveHint}>Comment period closed — view past topics and results</div>
+              </span>
+              <span style={styles.archiveChevron}>{showArchive ? '▲ Hide' : '▼ Show'}</span>
             </button>
             {showArchive && archivedTopics.map(topic => (
               <TopicCard
