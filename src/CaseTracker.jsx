@@ -37,64 +37,6 @@ const styles = {
   body: {
     padding: '32px',
   },
-  searchRow: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '24px',
-  },
-  input: {
-    flex: 1,
-    padding: '10px 12px',
-    fontSize: '14px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    color: '#111827',
-    outline: 'none',
-  },
-  searchBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#1a56a0',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '600',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  },
-  searchBtnDisabled: {
-    padding: '10px 20px',
-    backgroundColor: '#93afd4',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '600',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'not-allowed',
-    whiteSpace: 'nowrap',
-  },
-  notFound: {
-    textAlign: 'center',
-    padding: '24px',
-    color: '#6b7280',
-    fontSize: '14px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '6px',
-    border: '1px solid #e5e7eb',
-  },
-  resultCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    overflow: 'hidden',
-  },
-  resultHeader: {
-    backgroundColor: '#f9fafb',
-    padding: '16px 20px',
-    borderBottom: '1px solid #e5e7eb',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   caseNumber: {
     fontSize: '18px',
     fontWeight: '700',
@@ -105,9 +47,6 @@ const styles = {
     borderRadius: '20px',
     fontSize: '13px',
     fontWeight: '600',
-  },
-  resultBody: {
-    padding: '20px',
   },
   fieldRow: {
     marginBottom: '16px',
@@ -199,6 +138,69 @@ const styles = {
     color: '#9ca3af',
     fontStyle: 'italic',
   },
+  caseNumberLink: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    font: 'inherit',
+    fontWeight: '700',
+    color: '#1a56a0',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px',
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: '8px',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+    maxWidth: '640px',
+    width: '100%',
+    maxHeight: '85vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  modalHeaderBar: {
+    backgroundColor: '#f9fafb',
+    padding: '16px 20px',
+    borderBottom: '1px solid #e5e7eb',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    flexShrink: 0,
+  },
+  modalHeaderLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  modalCloseBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#6b7280',
+    fontSize: '20px',
+    cursor: 'pointer',
+    lineHeight: 1,
+    padding: '0 4px',
+  },
+  modalScrollBody: {
+    padding: '20px',
+    overflowY: 'auto',
+    flex: 1,
+  },
 }
 
 function getStatusStyle(statusName) {
@@ -228,18 +230,18 @@ function formatDateTime(dateStr) {
 const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
 
 function CaseTracker() {
-  const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [comments, setComments] = useState([])
-  const [searched, setSearched] = useState(false)
-  const [auditLog, setAuditLog] = useState([])
-
   // All cases table
   const [allCases, setAllCases] = useState([])
   const [allCasesLoading, setAllCasesLoading] = useState(true)
   const [tableSearch, setTableSearch] = useState('')
   const [tableStatusFilter, setTableStatusFilter] = useState('all')
+
+  // Case detail modal
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalCase, setModalCase] = useState(null)
+  const [modalComments, setModalComments] = useState([])
+  const [modalAuditLog, setModalAuditLog] = useState([])
+  const [modalLoading, setModalLoading] = useState(false)
 
   useEffect(() => {
     loadAllCases()
@@ -264,14 +266,14 @@ function CaseTracker() {
     setAllCasesLoading(false)
   }
 
-  async function handleSearch() {
-    if (!query.trim()) return
-    setLoading(true)
-    setSearched(true)
-    setResult(null)
-    setComments([])
+  async function openCaseModal(caseId) {
+    setModalOpen(true)
+    setModalLoading(true)
+    setModalCase(null)
+    setModalComments([])
+    setModalAuditLog([])
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('cases')
       .select(`
         id,
@@ -283,33 +285,23 @@ function CaseTracker() {
         closed_date,
         statuses ( name )
       `)
-      .ilike('case_number', query.trim())
+      .eq('id', caseId)
       .single()
+    setModalCase(data || null)
 
-    if (error || !data) {
-      setResult(null)
-    } else {
-      setResult(data)
-      const { data: commentData } = await supabase
-        .from('case_comments')
-        .select('*')
-        .eq('case_id', data.id)
-        .order('created_at', { ascending: true })
-      setComments(commentData || [])
-
-      const { data: auditData } = await supabase
-        .from('case_audit_log')
-        .select('*')
-        .eq('case_id', data.id)
-        .not('action', 'ilike', '%internal note%')
-        .order('created_at', { ascending: true })
-      setAuditLog(auditData || [])
+    if (data) {
+      const [{ data: commentData }, { data: auditData }] = await Promise.all([
+        supabase.from('case_comments').select('*').eq('case_id', caseId).order('created_at', { ascending: true }),
+        supabase.from('case_audit_log').select('*').eq('case_id', caseId).not('action', 'ilike', '%internal note%').order('created_at', { ascending: true }),
+      ])
+      setModalComments(commentData || [])
+      setModalAuditLog(auditData || [])
     }
-    setLoading(false)
+    setModalLoading(false)
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter') handleSearch()
+  function closeCaseModal() {
+    setModalOpen(false)
   }
 
   const filteredCases = allCases.filter(c => {
@@ -332,7 +324,7 @@ function CaseTracker() {
   return (
     <div style={styles.page}>
 
-      {/* Case lookup card — unchanged */}
+      {/* Page header */}
       <div style={styles.card}>
         <div style={styles.header}>
           <h1 style={styles.headerTitle}>Check Request Status</h1>
@@ -340,130 +332,120 @@ function CaseTracker() {
         </div>
         <div style={styles.body}>
           <p style={styles.hint}>
-            Enter the case number from your confirmation email to check the current status of your request.
+            Browse all submitted service requests below. 💡 Click any case number to view its full details, including status updates and activity.
           </p>
-
-          <div style={styles.searchRow}>
-            <input
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="e.g. 1-26"
-              style={styles.input}
-            />
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              style={loading ? styles.searchBtnDisabled : styles.searchBtn}
-            >
-              {loading ? 'Searching...' : 'Look Up'}
-            </button>
-          </div>
-
-          {searched && !loading && !result && (
-            <div style={styles.notFound}>
-              No case found for <strong>{query}</strong>. Please check your case number and try again.
-            </div>
-          )}
-
-          {result && (
-            <div style={styles.resultCard}>
-              <div style={styles.resultHeader}>
-                <div style={styles.caseNumber}>Case #{result.case_number}</div>
-                <div style={getStatusStyle(result.statuses?.name)}>
-                  {result.statuses?.name || 'Unknown'}
-                </div>
-              </div>
-              <div style={styles.resultBody}>
-                <div style={styles.fieldRow}>
-                  <div style={styles.fieldLabel}>Date Submitted</div>
-                  <div style={styles.fieldValue}>{formatDate(result.date_submitted)}</div>
-                </div>
-                <hr style={styles.divider} />
-                <div style={styles.fieldRow}>
-                  <div style={styles.fieldLabel}>
-                    {result.is_91a ? 'Subject of Request' : 'Location / Address'}
-                  </div>
-                  <div style={styles.fieldValue}>{result.location || '—'}</div>
-                </div>
-                <hr style={styles.divider} />
-                <div style={styles.fieldRow}>
-                  <div style={styles.fieldLabel}>Description</div>
-                  <div style={styles.fieldValue}>{result.description}</div>
-                </div>
-                {result.is_91a && (
-                  <>
-                    <hr style={styles.divider} />
-                    <div style={styles.fieldRow}>
-                      <div style={styles.fieldLabel}>Request Type</div>
-                      <div style={styles.tag91a}>Right-to-Know (RSA 91-A)</div>
-                    </div>
-                  </>
-                )}
-                {result.closed_date && (
-                  <>
-                    <hr style={styles.divider} />
-                    <div style={styles.fieldRow}>
-                      <div style={styles.fieldLabel}>Date Closed</div>
-                      <div style={styles.fieldValue}>{formatDate(result.closed_date)}</div>
-                    </div>
-                  </>
-                )}
-
-                {/* Public comments / updates */}
-                <div style={styles.commentsSection}>
-                  <div style={styles.commentsSectionTitle}>
-                    📣 City Updates
-                  </div>
-                  {comments.length === 0 ? (
-                    <div style={styles.noComments}>No updates from the city yet.</div>
-                  ) : (
-                    comments.map(c => (
-                      <div key={c.id} style={styles.commentItem}>
-                        <div style={styles.commentDot} />
-                        <div style={styles.commentContent}>
-                          <div style={styles.commentMeta}>
-                            City of Franklin · {formatDateTime(c.created_at)}
-                          </div>
-                          <div style={styles.commentText}>{c.comment}</div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-
-                  {/* Case Activity */}
-                  {auditLog.length > 0 && (
-                    <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
-                        📋 Case Activity
-                      </div>
-                      {auditLog.map(entry => (
-                        <div key={entry.id} style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-start' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#9ca3af', marginTop: '5px', flexShrink: 0 }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.4' }}>{entry.action}</div>
-                            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{formatDateTime(entry.created_at)}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Attachments */}
-                  <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
-                      📎 Attachments
-                    </div>
-                    <CaseFiles caseId={result.id} canUpload={false} />
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Case detail modal */}
+      {modalOpen && (
+        <div style={styles.modalOverlay} onClick={closeCaseModal}>
+          <div style={styles.modalCard} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalHeaderBar}>
+              <div style={styles.modalHeaderLeft}>
+                <div style={styles.caseNumber}>{modalCase ? `Case #${modalCase.case_number}` : 'Loading...'}</div>
+                {modalCase && (
+                  <div style={getStatusStyle(modalCase.statuses?.name)}>
+                    {modalCase.statuses?.name || 'Unknown'}
+                  </div>
+                )}
+              </div>
+              <button style={styles.modalCloseBtn} onClick={closeCaseModal}>✕</button>
+            </div>
+            <div style={styles.modalScrollBody}>
+              {modalLoading || !modalCase ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading case details...</div>
+              ) : (
+                <>
+                  <div style={styles.fieldRow}>
+                    <div style={styles.fieldLabel}>Date Submitted</div>
+                    <div style={styles.fieldValue}>{formatDate(modalCase.date_submitted)}</div>
+                  </div>
+                  <hr style={styles.divider} />
+                  <div style={styles.fieldRow}>
+                    <div style={styles.fieldLabel}>
+                      {modalCase.is_91a ? 'Subject of Request' : 'Location / Address'}
+                    </div>
+                    <div style={styles.fieldValue}>{modalCase.location || '—'}</div>
+                  </div>
+                  <hr style={styles.divider} />
+                  <div style={styles.fieldRow}>
+                    <div style={styles.fieldLabel}>Description</div>
+                    <div style={styles.fieldValue}>{modalCase.description}</div>
+                  </div>
+                  {modalCase.is_91a && (
+                    <>
+                      <hr style={styles.divider} />
+                      <div style={styles.fieldRow}>
+                        <div style={styles.fieldLabel}>Request Type</div>
+                        <div style={styles.tag91a}>Right-to-Know (RSA 91-A)</div>
+                      </div>
+                    </>
+                  )}
+                  {modalCase.closed_date && (
+                    <>
+                      <hr style={styles.divider} />
+                      <div style={styles.fieldRow}>
+                        <div style={styles.fieldLabel}>Date Closed</div>
+                        <div style={styles.fieldValue}>{formatDate(modalCase.closed_date)}</div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Public comments / updates */}
+                  <div style={styles.commentsSection}>
+                    <div style={styles.commentsSectionTitle}>
+                      📣 City Updates
+                    </div>
+                    {modalComments.length === 0 ? (
+                      <div style={styles.noComments}>No updates from the city yet.</div>
+                    ) : (
+                      modalComments.map(c => (
+                        <div key={c.id} style={styles.commentItem}>
+                          <div style={styles.commentDot} />
+                          <div style={styles.commentContent}>
+                            <div style={styles.commentMeta}>
+                              City of Franklin · {formatDateTime(c.created_at)}
+                            </div>
+                            <div style={styles.commentText}>{c.comment}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {/* Case Activity */}
+                    {modalAuditLog.length > 0 && (
+                      <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
+                          📋 Case Activity
+                        </div>
+                        {modalAuditLog.map(entry => (
+                          <div key={entry.id} style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-start' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#9ca3af', marginTop: '5px', flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '13px', color: '#374151', lineHeight: '1.4' }}>{entry.action}</div>
+                              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{formatDateTime(entry.created_at)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Attachments */}
+                    <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#6b7280', marginBottom: '14px' }}>
+                        📎 Attachments
+                      </div>
+                      <CaseFiles caseId={modalCase.id} canUpload={false} />
+                    </div>
+
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* All Cases Table */}
       <div style={{ maxWidth: '1100px', margin: '32px auto 0 auto' }}>
@@ -563,8 +545,10 @@ function CaseTracker() {
                   <tbody>
                     {filteredCases.map(c => (
                       <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={{ padding: '12px 14px', fontSize: '13px', fontWeight: '700', color: '#1a56a0', verticalAlign: 'top' }}>
-                          {c.case_number}
+                        <td style={{ padding: '12px 14px', fontSize: '13px', verticalAlign: 'top' }}>
+                          <button style={styles.caseNumberLink} onClick={() => openCaseModal(c.id)}>
+                            {c.case_number}
+                          </button>
                           {c.is_91a && (
                             <span style={{ display: 'block', backgroundColor: '#eff6ff', color: '#1a56a0', border: '1px solid #bfdbfe', borderRadius: '3px', padding: '1px 4px', fontSize: '10px', fontWeight: '600', marginTop: '3px', width: 'fit-content' }}>
                               91-A
