@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const RESTRICTED_ISSUE_TYPE_NAME = 'Noise / Nuisance / Animal / Crime'
 
-const POLICE_REFERRAL_TEXT = `This system is not the correct venue for noise, nuisance, animal, or crime-related concerns — these need to be reported directly to the Franklin Police Department for a timely response.
+const POLICE_REFERRAL_TEXT = `This is a non-emergency request system and is not designed to address noise, nuisance, animal, or crime-related concerns — these need to be reported directly to the Franklin Police Department for a timely response.
 
 Please use the non-emergency line at (603) 934-2535 for incidents that are not in progress, and call 911 for emergencies or crimes currently occurring.`
 
