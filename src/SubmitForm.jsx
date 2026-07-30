@@ -5,6 +5,12 @@ import CaseFiles from './CaseFiles'
 const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+const RESTRICTED_ISSUE_TYPE_NAME = 'Noise / Nuisance / Animal / Crime'
+
+const POLICE_REFERRAL_TEXT = `This system is not the correct venue for noise, nuisance, animal, or crime-related concerns — these need to be reported directly to the Franklin Police Department for a timely response.
+
+Please use the non-emergency line at (603) 934-2535 for incidents that are not in progress, and call 911 for emergencies or crimes currently occurring.`
+
 const POLICY_TEXT = `Franklin Service Request System — Policy
 
 WHAT THIS SYSTEM IS FOR
@@ -377,6 +383,27 @@ function PolicyModal({ onClose }) {
   )
 }
 
+function PoliceReferralModal({ onClose }) {
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={styles.modalCard} onClick={e => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>Please Contact the Police Department</h2>
+          <button style={styles.modalCloseBtn} onClick={onClose}>✕</button>
+        </div>
+        <div style={styles.modalBody}>
+          {POLICE_REFERRAL_TEXT.split('\n\n').map((paragraph, i) => (
+            <p key={i} style={{ fontSize: '14px', color: '#374151', lineHeight: '1.7', margin: '0 0 12px 0' }}>{paragraph}</p>
+          ))}
+        </div>
+        <div style={styles.modalFooter}>
+          <button style={styles.modalCloseFooterBtn} onClick={onClose}>OK, I Understand</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SubmitForm() {
   const [issueTypes, setIssueTypes] = useState([])
   const [formData, setFormData] = useState({
@@ -390,6 +417,7 @@ function SubmitForm() {
   })
   const [policyAcknowledged, setPolicyAcknowledged] = useState(false)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [showPoliceModal, setShowPoliceModal] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [caseNumber, setCaseNumber] = useState('')
   const [newCaseId, setNewCaseId] = useState(null)
@@ -405,6 +433,15 @@ function SubmitForm() {
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target
+
+    if (name === 'issue_type_id') {
+      const selected = issueTypes.find(t => t.id === parseInt(value))
+      if (selected && selected.name === RESTRICTED_ISSUE_TYPE_NAME) {
+        setShowPoliceModal(true)
+        return
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -416,6 +453,12 @@ function SubmitForm() {
 
     if (!policyAcknowledged) {
       alert('Please acknowledge the submission policy before submitting.')
+      return
+    }
+
+    const restrictedCheckIssueType = issueTypes.find(t => t.id === parseInt(formData.issue_type_id))
+    if (restrictedCheckIssueType && restrictedCheckIssueType.name === RESTRICTED_ISSUE_TYPE_NAME) {
+      setShowPoliceModal(true)
       return
     }
 
@@ -630,6 +673,7 @@ function SubmitForm() {
   return (
     <div style={styles.page}>
       {showPolicyModal && <PolicyModal onClose={() => setShowPolicyModal(false)} />}
+      {showPoliceModal && <PoliceReferralModal onClose={() => setShowPoliceModal(false)} />}
 
       <div style={styles.card}>
         <div style={styles.header}>
