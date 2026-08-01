@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { loadDepartmentPerformance } from './departmentPerformance'
 
 const styles = {
   page: {
@@ -274,6 +275,105 @@ const styles = {
     fontSize: '14px',
     fontStyle: 'italic',
   },
+  perfSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    padding: '20px 24px',
+    marginBottom: '24px',
+  },
+  perfTitle: {
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: '4px',
+  },
+  perfSub: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginBottom: '18px',
+  },
+  perfGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '16px',
+    marginBottom: '20px',
+  },
+  perfCard: {
+    backgroundColor: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    padding: '16px',
+  },
+  perfCardLabel: {
+    fontSize: '11px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    color: '#6b7280',
+    marginBottom: '8px',
+  },
+  perfCardValue: {
+    fontSize: '22px',
+    fontWeight: '700',
+    color: '#1a56a0',
+  },
+  perfCardSub: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '4px',
+  },
+  perfCompareRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '13px',
+    color: '#374151',
+    marginTop: '8px',
+  },
+  perfBarRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '8px',
+  },
+  perfBarLabel: {
+    fontSize: '12px',
+    color: '#374151',
+    width: '150px',
+    flexShrink: 0,
+  },
+  perfBarTrack: {
+    flex: 1,
+    backgroundColor: '#e5e7eb',
+    borderRadius: '4px',
+    height: '10px',
+    overflow: 'hidden',
+  },
+  perfBarFill: {
+    backgroundColor: '#1a56a0',
+    height: '100%',
+  },
+  perfBarCount: {
+    fontSize: '12px',
+    color: '#6b7280',
+    width: '30px',
+    textAlign: 'right',
+    flexShrink: 0,
+  },
+  resourceNote: {
+    backgroundColor: '#fef3c7',
+    border: '1px solid #fde68a',
+    borderRadius: '6px',
+    padding: '14px 16px',
+    fontSize: '13px',
+    color: '#92400e',
+    marginTop: '4px',
+  },
+  perfNoData: {
+    fontSize: '13px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
 }
 
 function getStatusStyle(name) {
@@ -300,7 +400,7 @@ function daysSince(dateStr) {
   return Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
 }
 
-function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint }) {
+function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint, isAdminView = false }) {
   const [cases, setCases] = useState([])
   const [departmentName, setDepartmentName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -309,6 +409,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   const [selectedIds, setSelectedIds] = useState([])
   const [urgentCount, setUrgentCount] = useState(0)
   const [urgentCaseIds, setUrgentCaseIds] = useState(new Set())
+  const [perf, setPerf] = useState(null)
 
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -320,6 +421,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   useEffect(() => {
     loadDepartmentName()
     loadCases()
+    loadDepartmentPerformance(departmentId).then(setPerf)
   }, [departmentId, refreshKey])
 
   useEffect(() => {
@@ -503,6 +605,75 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         </div>
       </div>
 
+      {perf && perf.hasData && (
+        <div style={styles.perfSection}>
+          <div style={styles.perfTitle}>Department Performance</div>
+          <div style={styles.perfSub}>Year-to-date, compared against the citywide average — not against other departments.</div>
+
+          <div style={styles.perfGrid}>
+            <div style={styles.perfCard}>
+              <div style={styles.perfCardLabel}>Volume</div>
+              <div style={styles.perfCardValue}>{perf.deptVolume} case{perf.deptVolume !== 1 ? 's' : ''}</div>
+              {perf.volumeSharePct !== null && (
+                <div style={styles.perfCardSub}>{perf.volumeSharePct}% of all {perf.citywideCaseCount} cases received by the City this year</div>
+              )}
+            </div>
+
+            <div style={styles.perfCard}>
+              <div style={styles.perfCardLabel}>Resolution Time</div>
+              {perf.deptMedian !== null ? (
+                <>
+                  <div style={styles.perfCardValue}>{perf.deptMedian} day{perf.deptMedian !== 1 ? 's' : ''} <span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>typical</span></div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Fastest: {perf.deptFastest}d · Longest: {perf.deptLongest}d</div>
+                  {perf.citywideMedian !== null && (
+                    <div style={styles.perfCompareRow}>
+                      <span>Your median: {perf.deptMedian}d</span>
+                      <span>Citywide median: {perf.citywideMedian}d</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={styles.perfNoData}>Not enough closed cases yet</div>
+              )}
+            </div>
+
+            <div style={styles.perfCard}>
+              <div style={styles.perfCardLabel}>Public Comment Rate</div>
+              {perf.deptCommentRatePct !== null ? (
+                <>
+                  <div style={styles.perfCardValue}>{perf.deptCommentRatePct}%</div>
+                  {perf.citywideCommentRatePct !== null && (
+                    <div style={styles.perfCompareRow}>
+                      <span>Yours: {perf.deptCommentRatePct}%</span>
+                      <span>Citywide: {perf.citywideCommentRatePct}%</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={styles.perfNoData}>Not enough data yet</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ ...styles.perfCardLabel, marginBottom: '10px' }}>Status Breakdown (This Year)</div>
+          {Object.entries(perf.statusBreakdown).map(([name, count]) => (
+            <div key={name} style={styles.perfBarRow}>
+              <div style={styles.perfBarLabel}>{name}</div>
+              <div style={styles.perfBarTrack}>
+                <div style={{ ...styles.perfBarFill, width: `${(count / perf.deptVolume) * 100}%` }} />
+              </div>
+              <div style={styles.perfBarCount}>{count}</div>
+            </div>
+          ))}
+
+          {perf.showResourceNeedNote && (
+            <div style={styles.resourceNote}>
+              Your department is handling a higher-than-average caseload with longer-than-average resolution times. This may reflect a need for additional resources.
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
           <div>
@@ -605,46 +776,50 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
       </div>
 
       {/* Password change */}
-      <div style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '13px', color: '#6b7280' }}>Need to update your login credentials?</span>
-        <button
-          onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMsg(null) }}
-          style={{ padding: '6px 14px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#374151', fontSize: '13px', fontWeight: '600', borderRadius: '6px', cursor: 'pointer' }}
-        >
-          Change My Password
-        </button>
-      </div>
+      {!isAdminView && (
+        <>
+          <div style={{ marginTop: '24px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '13px', color: '#6b7280' }}>Need to update your login credentials?</span>
+            <button
+              onClick={() => { setShowPasswordForm(!showPasswordForm); setPasswordMsg(null) }}
+              style={{ padding: '6px 14px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#374151', fontSize: '13px', fontWeight: '600', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Change My Password
+            </button>
+          </div>
 
-      {showPasswordForm && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginTop: '8px', maxWidth: '400px', marginLeft: 'auto' }}>
-          <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>Change Password</div>
-          {passwordMsg && (
-            <div style={{ fontSize: '13px', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', backgroundColor: passwordMsg.type === 'error' ? '#fee2e2' : '#d1fae5', color: passwordMsg.type === 'error' ? '#991b1b' : '#065f46' }}>
-              {passwordMsg.text}
+          {showPasswordForm && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginTop: '8px', maxWidth: '400px', marginLeft: 'auto' }}>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '16px' }}>Change Password</div>
+              {passwordMsg && (
+                <div style={{ fontSize: '13px', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', backgroundColor: passwordMsg.type === 'error' ? '#fee2e2' : '#d1fae5', color: passwordMsg.type === 'error' ? '#991b1b' : '#065f46' }}>
+                  {passwordMsg.text}
+                </div>
+              )}
+              <input
+                type="password"
+                placeholder="New password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box', outline: 'none' }}
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box', outline: 'none' }}
+              />
+              <button
+                onClick={handleChangePassword}
+                disabled={savingPassword}
+                style={{ padding: '8px 20px', backgroundColor: savingPassword ? '#93afd4' : '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: savingPassword ? 'not-allowed' : 'pointer' }}
+              >
+                {savingPassword ? 'Saving...' : 'Update Password'}
+              </button>
             </div>
           )}
-          <input
-            type="password"
-            placeholder="New password"
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-            style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box', outline: 'none' }}
-          />
-          <input
-            type="password"
-            placeholder="Confirm new password"
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '10px', boxSizing: 'border-box', outline: 'none' }}
-          />
-          <button
-            onClick={handleChangePassword}
-            disabled={savingPassword}
-            style={{ padding: '8px 20px', backgroundColor: savingPassword ? '#93afd4' : '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: savingPassword ? 'not-allowed' : 'pointer' }}
-          >
-            {savingPassword ? 'Saving...' : 'Update Password'}
-          </button>
-        </div>
+        </>
       )}
 
     </div>

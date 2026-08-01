@@ -17,6 +17,7 @@ import PrintPublicInputTopic from './PrintPublicInputTopic'
 import PublicInputSubmit from './PublicInputSubmit'
 import AdminTopics from './AdminTopics'
 import AdminModeration from './AdminModeration'
+import AdminDepartmentView from './AdminDepartmentView'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -164,6 +165,7 @@ function App() {
         border: 'none',
         color: (page === target ||
           (target === 'admin' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin') ||
+          (target === 'admin-department-view' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin-department-view') ||
           (target === 'department' && ['case-detail', 'print-work-order'].includes(page) && previousPage === 'department') ||
           (target === 'admin-public-topics' && page === 'admin-public-moderation') ||
           (target === 'public-input' && ['public-input-detail', 'public-input-submit'].includes(page))
@@ -187,6 +189,7 @@ function App() {
           {navBtn('analytics', 'City Analytics')}
           {navBtn('public-input', 'Public Comment')}
           {session && userRole === 'admin' && navBtn('admin', 'Admin')}
+          {session && userRole === 'admin' && navBtn('admin-department-view', 'Departments')}
           {session && userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
           {session && userRole === 'department' && navBtn('department', 'My Cases')}
           <div style={{ marginLeft: 'auto' }}>
@@ -231,6 +234,9 @@ function App() {
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (
         <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} />
+      )}
+      {page === 'admin-department-view' && session && userRole === 'admin' && (
+        <AdminDepartmentView onViewCase={handleViewCase} refreshKey={refreshKey} onBulkPrint={handleBulkPrint} />
       )}
       {page === 'admin-public-topics' && session && userRole === 'admin' && <AdminTopics />}
       {page === 'admin-public-moderation' && session && userRole === 'admin' && <AdminModeration />}
