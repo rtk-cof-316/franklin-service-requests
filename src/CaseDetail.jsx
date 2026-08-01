@@ -350,6 +350,10 @@ const [savingArchive, setSavingArchive] = useState(false)
         await referCaseToDepartment(parseInt(adminReferTargetDept[cdId]), deptName)
         setAdminReferTargetDept(prev => ({ ...prev, [cdId]: '' }))
       }
+      const newStatusIsClosing = allStatuses.find(s => s.id === newStatusId)?.is_closing
+      if (statusChanged && newStatusIsClosing) {
+        await checkAutoCloseCase()
+      }
       await loadCase()
       await loadAuditLog()
     }
@@ -388,31 +392,12 @@ const [savingArchive, setSavingArchive] = useState(false)
     if (auditParts.length > 0) {
       await supabase.from('case_audit_log').insert([{ case_id: caseId, action: auditParts.join(', '), performed_by: userEmail, created_at: new Date().toISOString() }])
     }
-    // Notify admin if dept marked their status as closed
-    if (statusChanged && selectedStatusIsClosing) {
-      try {
-        await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            type: 'admin_dept_closed',
-            caseNumber: caseData.case_number,
-            location: caseData.location,
-            description: caseData.description,
-            departmentName: myDeptAssignment.departments?.name,
-            deptStatus: newStatus,
-          }),
-        })
-      } catch (e) {
-        console.error('Admin dept closed notification error:', e)
-      }
-    }
     if (statusChanged && newStatus === REFERRED_STATUS_NAME && referTargetDept) {
       await referCaseToDepartment(parseInt(referTargetDept), myDeptAssignment.departments?.name)
       setReferTargetDept('')
+    }
+    if (statusChanged && selectedStatusIsClosing) {
+      await checkAutoCloseCase()
     }
     setDeptSaveSuccess(true)
     await loadCase()
@@ -501,6 +486,41 @@ const [savingArchive, setSavingArchive] = useState(false)
         body: JSON.stringify({ type: 'department_assignment', departmentId: targetDeptId, caseNumber: caseData.case_number, location: caseData.location, description: caseData.description, departmentName: targetDeptName }),
       })
     } catch (e) { console.error('Referral notification error:', e) }
+  }
+
+  // Fetches fresh (not relying on possibly-stale component state) since this runs
+  // right after a case_departments status write. Closes the master case and notifies
+  // the submitter once every assigned department has reached a closing status.
+  // Skipped for 91-A requests, which have their own manual completion workflow.
+  async function checkAutoCloseCase() {
+    const { data } = await supabase
+      .from('cases')
+      .select('is_91a, submitter_email, case_number, location, description, statuses ( is_closing ), case_departments ( statuses ( is_closing ) )')
+      .eq('id', caseId)
+      .single()
+    if (!data || data.is_91a || data.statuses?.is_closing) return
+    if (!data.case_departments || data.case_departments.length === 0) return
+    const allDeptsClosed = data.case_departments.every(cd => cd.statuses?.is_closing)
+    if (!allDeptsClosed) return
+
+    const closedStatus = allStatuses.find(s => s.name === 'Closed')
+    if (!closedStatus) return
+    await supabase.from('cases').update({
+      status_id: closedStatus.id,
+      closed_date: new Date().toISOString(),
+      status_changed_at: new Date().toISOString(),
+    }).eq('id', caseId)
+    await logAudit(caseId, `Case automatically closed — all assigned departments have completed their work`, 'System (auto-close)')
+
+    if (data.submitter_email) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ type: 'case_closed', email: data.submitter_email, caseNumber: data.case_number, location: data.location, description: data.description }),
+        })
+      } catch (e) { console.error('Auto-close submitter notification error:', e) }
+    }
   }
 
   async function handleAddDept() {

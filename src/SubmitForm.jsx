@@ -7,6 +7,11 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const RESTRICTED_ISSUE_TYPE_NAME = 'Noise / Nuisance / Animal / Crime'
 
+// Departments Brenda is the routing override recipient for (see departmentRecipients.ts).
+// New-case notifications to her are limited to these, since every other department now
+// handles its own incoming cases without her involvement.
+const ADMIN_ASSOCIATED_DEPARTMENTS = ['City Manager', 'IT']
+
 const POLICE_REFERRAL_TEXT = `This is a non-emergency request system and is not designed to address noise, nuisance, animal, or crime-related concerns — these need to be reported directly to the Franklin Police Department for a timely response.
 
 Please use the non-emergency line at (603) 934-2535 for incidents that are not in progress, and call 911 for emergencies or crimes currently occurring.`
@@ -425,7 +430,7 @@ function SubmitForm() {
 
   useEffect(() => {
     async function loadFormData() {
-      const { data: issueData } = await supabase.from('issue_types').select('*').order('name')
+      const { data: issueData } = await supabase.from('issue_types').select('*, departments(name)').order('name')
       setIssueTypes(issueData || [])
     }
     loadFormData()
@@ -630,26 +635,28 @@ function SubmitForm() {
       }
     }
 
-// Notify admin of new case
-    try {
-      const selectedIssueTypeName = issueTypes.find(t => t.id === parseInt(formData.issue_type_id))?.name
-      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          type: 'admin_new_case',
-          caseNumber: newCaseNumber,
-          location: formData.location,
-          description: formData.description,
-          issueType: selectedIssueTypeName || '—',
-          submitterName: formData.submitter_name || 'Anonymous',
-        }),
-      })
-    } catch (e) {
-      console.error('Admin notification error:', e)
+// Notify admin of new case -- only for departments she's directly associated with;
+    // every other department now handles its own incoming cases without her involvement.
+    if (ADMIN_ASSOCIATED_DEPARTMENTS.includes(selectedIssueType?.departments?.name)) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'admin_new_case',
+            caseNumber: newCaseNumber,
+            location: formData.location,
+            description: formData.description,
+            issueType: selectedIssueType?.name || '—',
+            submitterName: formData.submitter_name || 'Anonymous',
+          }),
+        })
+      } catch (e) {
+        console.error('Admin notification error:', e)
+      }
     }
 
     setNewCaseId(newCase.id)
