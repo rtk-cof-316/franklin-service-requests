@@ -24,7 +24,7 @@ export async function loadDepartmentPerformance(departmentId) {
 
   const { data: allRows } = await supabase
     .from('case_departments')
-    .select('case_id, department_id, created_at, closed_date, statuses ( name, is_closing )')
+    .select('case_id, department_id, created_at, closed_date, statuses ( name, is_closing ), cases ( statuses ( is_closing ) )')
     .gte('created_at', yearStart)
 
   const rows = allRows || []
@@ -45,11 +45,20 @@ export async function loadDepartmentPerformance(departmentId) {
   const volumeSharePct = toPct(citywideCaseCount ? deptVolume / citywideCaseCount : null)
 
   // Resolution time (each department's own dwell time on a case: closed_date - created_at).
-  // closed_date === created_at exactly marks a row whose closed_date came from the one-time
-  // backfill (historical/seed data loaded with synchronized timestamps, not a real same-instant
-  // closure), so those are excluded here -- otherwise every department would show a misleading
-  // "0 days" until enough genuinely-measured closures accumulate.
-  const isMeasuredClosure = r => r.statuses?.is_closing && r.closed_date && r.closed_date !== r.created_at
+  // Eligibility checks the case's own closure too, not just the department row's status --
+  // some historical rows never got their own status flipped to a closing one even though the
+  // case itself genuinely closed, so relying on the department row alone would miss them.
+  // closed_date === created_at exactly would mark a same-instant closure, which in practice
+  // only ever happens from a bad backfill, not a real close -- excluded as a safety net.
+  // closed_date < created_at is chronologically impossible and shows up on historical
+  // multi-department cases where the seed data's per-row timestamps weren't kept in lifecycle
+  // order -- those rows are skipped rather than guessed at; real usage can't produce this since
+  // a department can't be closed before it was assigned.
+  const isMeasuredClosure = r =>
+    (r.statuses?.is_closing || r.cases?.statuses?.is_closing) &&
+    r.closed_date &&
+    r.closed_date !== r.created_at &&
+    new Date(r.closed_date) >= new Date(r.created_at)
   const deptDwellDays = deptRows.filter(isMeasuredClosure).map(r => daysBetween(r.created_at, r.closed_date))
   const citywideDwellDays = rows.filter(isMeasuredClosure).map(r => daysBetween(r.created_at, r.closed_date))
 
