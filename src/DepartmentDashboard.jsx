@@ -46,55 +46,6 @@ const styles = {
     marginTop: '2px',
     fontWeight: '400',
   },
-  cardsRow: {
-    display: 'flex',
-    gap: '16px',
-    marginBottom: '32px',
-    flexWrap: 'wrap',
-  },
-  scoreCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    padding: '20px 24px',
-    minWidth: '180px',
-    flex: '1',
-  },
-  scoreCardLabel: {
-    fontSize: '11px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    color: '#6b7280',
-    marginBottom: '8px',
-  },
-  scoreCardValue: {
-    fontSize: '36px',
-    fontWeight: '700',
-    color: '#1a56a0',
-    lineHeight: 1,
-  },
-  scoreCardSub: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginTop: '4px',
-  },
-  alertCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    padding: '20px 24px',
-    flex: '2',
-    minWidth: '280px',
-  },
-  alertCardLabel: {
-    fontSize: '11px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    color: '#6b7280',
-    marginBottom: '12px',
-  },
   alertRow: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -329,6 +280,13 @@ const styles = {
     fontSize: '13px',
     color: '#374151',
     marginTop: '8px',
+  },
+  perfCardFootnote: {
+    fontSize: '11px',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    lineHeight: '1.4',
+    marginTop: '10px',
   },
   perfBarRow: {
     display: 'flex',
@@ -573,106 +531,107 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         </div>
       )}
 
-      <div style={styles.cardsRow}>
-        <div style={styles.scoreCard}>
-          <div style={styles.scoreCardLabel}>Open Cases</div>
-          <div style={styles.scoreCardValue}>{openCases.length}</div>
-          <div style={styles.scoreCardSub}>Your department's active cases</div>
-        </div>
-        <div style={styles.scoreCard}>
-          <div style={styles.scoreCardLabel}>Total Cases</div>
-          <div style={styles.scoreCardValue}>{cases.length}</div>
-          <div style={styles.scoreCardSub}>All time</div>
-        </div>
-        <div style={styles.alertCard}>
-          <div style={styles.alertCardLabel}>Follow-ups Due in Next 10 Days</div>
-          {upcomingFollowups.length === 0 ? (
-            <div style={styles.noAlerts}>No upcoming follow-ups</div>
-          ) : (
-            upcomingFollowups.map(c => {
-              const days = daysUntil(c.followup_due_date)
-              return (
-                <div key={c.id} style={styles.alertRow}>
-                  <span style={styles.alertCaseNum} onClick={() => onViewCase && onViewCase(c.id)}>#{c.case_number}</span>
-                  <span style={styles.alertLocation}>{c.location || c.description?.slice(0, 40)}</span>
-                  <span style={days <= 0 ? styles.alertDate : days <= 3 ? styles.alertDate : styles.alertDateSoon}>
-                    {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`}
-                  </span>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </div>
+      <div style={styles.perfSection}>
+        <div style={styles.perfTitle}>Department Performance</div>
+        <div style={styles.perfSub}>Year-to-date, compared against the citywide average.</div>
 
-      {perf && perf.hasData && (
-        <div style={styles.perfSection}>
-          <div style={styles.perfTitle}>Department Performance</div>
-          <div style={styles.perfSub}>Year-to-date, compared against the citywide average — not against other departments.</div>
-
-          <div style={styles.perfGrid}>
-            <div style={styles.perfCard}>
-              <div style={styles.perfCardLabel}>Volume</div>
-              <div style={styles.perfCardValue}>{perf.deptVolume} case{perf.deptVolume !== 1 ? 's' : ''}</div>
-              {perf.volumeSharePct !== null && (
-                <div style={styles.perfCardSub}>{perf.volumeSharePct}% of all {perf.citywideCaseCount} cases received by the City this year</div>
-              )}
-            </div>
-
-            <div style={styles.perfCard}>
-              <div style={styles.perfCardLabel}>Resolution Time</div>
-              {perf.deptMedian !== null ? (
-                <>
-                  <div style={styles.perfCardValue}>{perf.deptMedian} day{perf.deptMedian !== 1 ? 's' : ''} <span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>typical</span></div>
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Fastest: {perf.deptFastest}d · Longest: {perf.deptLongest}d</div>
-                  {perf.citywideMedian !== null && (
-                    <div style={styles.perfCompareRow}>
-                      <span>Your median: {perf.deptMedian}d</span>
-                      <span>Citywide median: {perf.citywideMedian}d</span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={styles.perfNoData}>Not enough closed cases yet</div>
-              )}
-            </div>
-
-            <div style={styles.perfCard}>
-              <div style={styles.perfCardLabel}>Public Comment Rate</div>
-              {perf.deptCommentRatePct !== null ? (
-                <>
-                  <div style={styles.perfCardValue}>{perf.deptCommentRatePct}%</div>
-                  {perf.citywideCommentRatePct !== null && (
-                    <div style={styles.perfCompareRow}>
-                      <span>Yours: {perf.deptCommentRatePct}%</span>
-                      <span>Citywide: {perf.citywideCommentRatePct}%</span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={styles.perfNoData}>Not enough data yet</div>
-              )}
-            </div>
+        <div style={styles.perfGrid}>
+          <div style={styles.perfCard}>
+            <div style={styles.perfCardLabel}>Open Cases</div>
+            <div style={styles.perfCardValue}>{openCases.length}</div>
+            <div style={styles.perfCardSub}>Your department's active cases</div>
           </div>
 
-          <div style={{ ...styles.perfCardLabel, marginBottom: '10px' }}>Status Breakdown (This Year)</div>
-          {Object.entries(perf.statusBreakdown).map(([name, count]) => (
-            <div key={name} style={styles.perfBarRow}>
-              <div style={styles.perfBarLabel}>{name}</div>
-              <div style={styles.perfBarTrack}>
-                <div style={{ ...styles.perfBarFill, width: `${(count / perf.deptVolume) * 100}%` }} />
+          {perf && perf.hasData && (
+            <>
+              <div style={styles.perfCard}>
+                <div style={styles.perfCardLabel}>Volume</div>
+                <div style={styles.perfCardValue}>{perf.deptVolume} case{perf.deptVolume !== 1 ? 's' : ''}</div>
+                {perf.volumeSharePct !== null && (
+                  <div style={styles.perfCardSub}>{perf.volumeSharePct}% of all {perf.citywideCaseCount} cases received by the City this year</div>
+                )}
               </div>
-              <div style={styles.perfBarCount}>{count}</div>
-            </div>
-          ))}
 
-          {perf.showResourceNeedNote && (
-            <div style={styles.resourceNote}>
-              Your department is handling a higher-than-average caseload with longer-than-average resolution times. This may reflect a need for additional resources.
-            </div>
+              <div style={styles.perfCard}>
+                <div style={styles.perfCardLabel}>Resolution Time</div>
+                {perf.deptMedian !== null ? (
+                  <>
+                    <div style={styles.perfCardValue}>{perf.deptMedian} day{perf.deptMedian !== 1 ? 's' : ''} <span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>typical</span></div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Fastest: {perf.deptFastest}d · Longest: {perf.deptLongest}d</div>
+                    {perf.citywideMedian !== null && (
+                      <div style={styles.perfCompareRow}>
+                        <span>{departmentName}: {perf.deptMedian}d</span>
+                        <span>Citywide: {perf.citywideMedian}d</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={styles.perfNoData}>Not enough closed cases yet</div>
+                )}
+              </div>
+
+              <div style={styles.perfCard}>
+                <div style={styles.perfCardLabel}>Public Comment Rate</div>
+                {perf.deptCommentRatePct !== null ? (
+                  <>
+                    <div style={styles.perfCardValue}>{perf.deptCommentRatePct}%</div>
+                    {perf.citywideCommentRatePct !== null && (
+                      <div style={styles.perfCompareRow}>
+                        <span>{departmentName}: {perf.deptCommentRatePct}%</span>
+                        <span>Citywide: {perf.citywideCommentRatePct}%</span>
+                      </div>
+                    )}
+                    <div style={styles.perfCardFootnote}>
+                      Posting public updates lets residents see their request is being worked on, builds trust in the process, and cuts down on repeat calls asking for a status check.
+                    </div>
+                  </>
+                ) : (
+                  <div style={styles.perfNoData}>Not enough data yet</div>
+                )}
+              </div>
+            </>
           )}
         </div>
-      )}
+
+        <div style={{ ...styles.perfCardLabel, marginBottom: '10px' }}>Follow-ups Due in Next 10 Days</div>
+        {upcomingFollowups.length === 0 ? (
+          <div style={styles.noAlerts}>No upcoming follow-ups</div>
+        ) : (
+          upcomingFollowups.map(c => {
+            const days = daysUntil(c.followup_due_date)
+            return (
+              <div key={c.id} style={styles.alertRow}>
+                <span style={styles.alertCaseNum} onClick={() => onViewCase && onViewCase(c.id)}>#{c.case_number}</span>
+                <span style={styles.alertLocation}>{c.location || c.description?.slice(0, 40)}</span>
+                <span style={days <= 0 ? styles.alertDate : days <= 3 ? styles.alertDate : styles.alertDateSoon}>
+                  {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`}
+                </span>
+              </div>
+            )
+          })
+        )}
+
+        {perf && perf.hasData && (
+          <>
+            <div style={{ ...styles.perfCardLabel, marginTop: '20px', marginBottom: '10px' }}>Status Breakdown (This Year)</div>
+            {Object.entries(perf.statusBreakdown).map(([name, count]) => (
+              <div key={name} style={styles.perfBarRow}>
+                <div style={styles.perfBarLabel}>{name}</div>
+                <div style={styles.perfBarTrack}>
+                  <div style={{ ...styles.perfBarFill, width: `${(count / perf.deptVolume) * 100}%` }} />
+                </div>
+                <div style={styles.perfBarCount}>{count}</div>
+              </div>
+            ))}
+
+            {perf.showResourceNeedNote && (
+              <div style={styles.resourceNote}>
+                Your department is handling a higher-than-average caseload with longer-than-average resolution times. This may reflect a need for additional resources.
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <div style={styles.tableCard}>
         <div style={styles.tableHeader}>
