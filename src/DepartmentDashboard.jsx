@@ -300,8 +300,6 @@ function daysSince(dateStr) {
   return Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
 }
 
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-
 function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint }) {
   const [cases, setCases] = useState([])
   const [departmentName, setDepartmentName] = useState('')
@@ -338,7 +336,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('case_id, statuses ( name )')
+      .select('case_id, statuses ( name, is_closing )')
       .eq('department_id', departmentId)
 
     if (!caseDepts || caseDepts.length === 0) {
@@ -349,7 +347,11 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
     const caseIds = caseDepts.map(cd => cd.case_id)
     const deptStatusMap = {}
-    caseDepts.forEach(cd => { deptStatusMap[cd.case_id] = cd.statuses?.name || null })
+    const deptStatusClosingMap = {}
+    caseDepts.forEach(cd => {
+      deptStatusMap[cd.case_id] = cd.statuses?.name || null
+      deptStatusClosingMap[cd.case_id] = Boolean(cd.statuses?.is_closing)
+    })
 
     const { data, error } = await supabase
       .from('cases')
@@ -358,12 +360,16 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
       .order('date_submitted', { ascending: false })
 
     if (!error) {
-      const enriched = (data || []).map(c => ({ ...c, dept_status: deptStatusMap[c.id] || null }))
+      const enriched = (data || []).map(c => ({
+        ...c,
+        dept_status: deptStatusMap[c.id] || null,
+        dept_status_is_closing: deptStatusClosingMap[c.id] || false,
+      }))
       setCases(enriched)
 
       // Calculate urgent cases — open with no public comment for 7+ days
       const openCaseIds = enriched
-        .filter(c => !closedStatuses.includes((c.dept_status || '').toLowerCase()))
+        .filter(c => !c.dept_status_is_closing)
         .map(c => c.id)
 
       if (openCaseIds.length > 0) {
@@ -374,7 +380,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
         const casesWithComments = new Set(comments?.map(c => c.case_id) || [])
         const urgentCases = enriched.filter(c => {
-          const isOpen = !closedStatuses.includes((c.dept_status || '').toLowerCase())
+          const isOpen = !c.dept_status_is_closing
           const hasNoComment = !casesWithComments.has(c.id)
           const daysOpen = daysSince(c.date_submitted)
           return isOpen && hasNoComment && daysOpen >= 7
@@ -412,8 +418,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
   }
 
   const filteredCases = cases.filter(c => {
-    const deptStatus = (c.dept_status || '').toLowerCase()
-    const isOpen = !closedStatuses.includes(deptStatus)
+    const isOpen = !c.dept_status_is_closing
     if (statusFilter === 'open' && !isOpen) return false
     if (statusFilter === 'closed' && isOpen) return false
     if (statusFilter === 'urgent' && !urgentCaseIds.has(c.id)) return false
@@ -428,12 +433,12 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     return true
   })
 
-  const openCases = cases.filter(c => !closedStatuses.includes((c.dept_status || '').toLowerCase()))
+  const openCases = cases.filter(c => !c.dept_status_is_closing)
 
   const upcomingFollowups = cases.filter(c => {
     if (!c.followup_due_date) return false
     const days = daysUntil(c.followup_due_date)
-    const isOpen = !closedStatuses.includes((c.dept_status || '').toLowerCase())
+    const isOpen = !c.dept_status_is_closing
     return isOpen && days !== null && days >= -999 && days <= 10
   }).sort((a, b) => new Date(a.followup_due_date) - new Date(b.followup_due_date))
 

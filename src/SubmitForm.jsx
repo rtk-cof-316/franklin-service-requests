@@ -513,6 +513,7 @@ function SubmitForm() {
         status_id: statusData?.id || null,
         policy_acknowledged: true,
         created_at: new Date().toISOString(),
+        status_changed_at: new Date().toISOString(),
       }])
       .select()
       .single()

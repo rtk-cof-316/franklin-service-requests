@@ -90,8 +90,6 @@ function getStatusStyle(name) {
   return { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#374151', display: 'inline-block', whiteSpace: 'nowrap' }
 }
 
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-
 function PublicAnalytics() {
   const [cases, setCases] = useState([])
   const [deptCases, setDeptCases] = useState([])
@@ -114,7 +112,7 @@ function PublicAnalytics() {
   async function loadCases() {
     const { data } = await supabase
       .from('cases')
-      .select('id, case_number, date_submitted, closed_date, is_91a, submitter_name, requestor_id, location, description, statuses ( name ), issue_types ( name )')
+      .select('id, case_number, date_submitted, closed_date, is_91a, submitter_name, requestor_id, location, description, statuses ( name, is_closing ), issue_types ( name )')
     setCases(data || [])
   }
 
@@ -139,8 +137,8 @@ function PublicAnalytics() {
   )
 
   const totalCases = cases.length
-  const resolvedCases = cases.filter(c => closedStatuses.includes((c.statuses?.name || '').toLowerCase()))
-  const openCases = cases.filter(c => !closedStatuses.includes((c.statuses?.name || '').toLowerCase()))
+  const resolvedCases = cases.filter(c => c.statuses?.is_closing)
+  const openCases = cases.filter(c => !c.statuses?.is_closing)
   const resolutionRate = totalCases > 0 ? `${Math.round((resolvedCases.length / totalCases) * 100)}%` : '—'
 
   const avgDaysToResolve = (() => {
@@ -219,8 +217,8 @@ function PublicAnalytics() {
     const detail = rtkDetails.find(d => d.case_id === c.id)
     return { ...c, detail }
   }).filter(c => {
-    if (rtkStatusFilter === 'open' && closedStatuses.includes((c.statuses?.name || '').toLowerCase())) return false
-    if (rtkStatusFilter === 'closed' && !closedStatuses.includes((c.statuses?.name || '').toLowerCase())) return false
+    if (rtkStatusFilter === 'open' && c.statuses?.is_closing) return false
+    if (rtkStatusFilter === 'closed' && !c.statuses?.is_closing) return false
     if (rtkSearch.trim()) {
       const s = rtkSearch.toLowerCase()
       return (

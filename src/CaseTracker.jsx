@@ -227,8 +227,6 @@ function formatDateTime(dateStr) {
   return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-
 function CaseTracker() {
   // All cases table
   const [allCases, setAllCases] = useState([])
@@ -258,7 +256,7 @@ function CaseTracker() {
         location,
         description,
         is_91a,
-        statuses ( name ),
+        statuses ( name, is_closing ),
         issue_types ( name )
       `)
       .order('date_submitted', { ascending: false })
@@ -305,8 +303,7 @@ function CaseTracker() {
   }
 
   const filteredCases = allCases.filter(c => {
-    const statusName = (c.statuses?.name || '').toLowerCase()
-    const isOpen = !closedStatuses.includes(statusName)
+    const isOpen = !c.statuses?.is_closing
     if (tableStatusFilter === 'open' && !isOpen) return false
     if (tableStatusFilter === 'closed' && isOpen) return false
     if (tableSearch.trim()) {

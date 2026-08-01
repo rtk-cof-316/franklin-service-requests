@@ -258,9 +258,9 @@ const [savingArchive, setSavingArchive] = useState(false)
     const newIssueType = issueTypes.find(t => t.id === parseInt(selectedIssueType))?.name
     const old91a = caseData.is_91a
 
-    const closingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-    const isClosing = newStatus && closingStatuses.includes(newStatus.toLowerCase())
-    const isReopening = oldStatus && closingStatuses.includes(oldStatus.toLowerCase()) && !isClosing
+    const statusChanged = Boolean(newStatus && newStatus !== oldStatus)
+    const isClosing = statusChanged && allStatuses.find(s => s.id === parseInt(selectedStatus))?.is_closing
+    const isReopening = statusChanged && allStatuses.find(s => s.name === oldStatus)?.is_closing && !isClosing
 
     const updatePayload = {
       status_id: selectedStatus || null,
@@ -270,6 +270,7 @@ const [savingArchive, setSavingArchive] = useState(false)
     }
     if (isClosing) updatePayload.closed_date = new Date().toISOString()
     if (isReopening) updatePayload.closed_date = null
+    if (statusChanged) updatePayload.status_changed_at = new Date().toISOString()
 
     const { error } = await supabase.from('cases').update(updatePayload).eq('id', caseId).select()
 
@@ -330,9 +331,12 @@ const [savingArchive, setSavingArchive] = useState(false)
     const newStatusId = parseInt(deptStatusEdits[cdId])
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
     const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
-    const { error } = await supabase.from('case_departments').update({ status_id: newStatusId }).eq('id', cdId).select()
+    const statusChanged = Boolean(newStatusName && newStatusName !== oldStatusName)
+    const updatePayload = { status_id: newStatusId }
+    if (statusChanged) updatePayload.status_changed_at = new Date().toISOString()
+    const { error } = await supabase.from('case_departments').update(updatePayload).eq('id', cdId).select()
     if (!error) {
-      if (newStatusName && newStatusName !== oldStatusName) {
+      if (statusChanged) {
         await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
       }
       await loadCase()
@@ -342,9 +346,8 @@ const [savingArchive, setSavingArchive] = useState(false)
   }
 
   async function handleSaveDeptStatus() {
-    const closingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-    const selectedStatusName = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name || ''
-    if (closingStatuses.includes(selectedStatusName.toLowerCase()) && followupDate) {
+    const selectedStatusIsClosing = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.is_closing
+    if (selectedStatusIsClosing && followupDate) {
       alert('Please clear the follow-up due date before closing this case.')
       setSavingDeptStatus(false)
       return
@@ -354,11 +357,14 @@ const [savingArchive, setSavingArchive] = useState(false)
     setDeptSaveSuccess(false)
     const oldStatus = myDeptAssignment.statuses?.name
     const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
+    const statusChanged = Boolean(newStatus && newStatus !== oldStatus)
     const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
     await supabase.from('cases').update({ followup_due_date: followupDate || null }).eq('id', caseId)
-    await supabase.from('case_departments').update({ status_id: parseInt(deptSelectedStatus) }).eq('id', myDeptAssignment.id)
+    const deptUpdatePayload = { status_id: parseInt(deptSelectedStatus) }
+    if (statusChanged) deptUpdatePayload.status_changed_at = new Date().toISOString()
+    await supabase.from('case_departments').update(deptUpdatePayload).eq('id', myDeptAssignment.id)
     const auditParts = []
-    if (newStatus && newStatus !== oldStatus) auditParts.push(`${myDeptAssignment.departments?.name} status changed from "${oldStatus || 'none'}" to "${newStatus}"`)
+    if (statusChanged) auditParts.push(`${myDeptAssignment.departments?.name} status changed from "${oldStatus || 'none'}" to "${newStatus}"`)
     if (followupDate !== oldFollowup) {
       if (followupDate) auditParts.push(`Follow-up due date set to ${followupDate}`)
       else auditParts.push(`Follow-up due date cleared`)
@@ -367,8 +373,7 @@ const [savingArchive, setSavingArchive] = useState(false)
       await supabase.from('case_audit_log').insert([{ case_id: caseId, action: auditParts.join(', '), performed_by: userEmail, created_at: new Date().toISOString() }])
     }
     // Notify admin if dept marked their status as closed
-    const deptClosingStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-    if (newStatus && deptClosingStatuses.includes(newStatus.toLowerCase())) {
+    if (statusChanged && selectedStatusIsClosing) {
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
           method: 'POST',

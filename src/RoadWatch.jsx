@@ -39,7 +39,6 @@ function createColoredIcon(color) {
 
 const ROAD_ISSUE_TYPES = ['Pothole', 'Crack / Pavement', 'Drainage', 'Heave', 'Signage / Traffic', 'Plowing / Sanding']
 const FRANKLIN_CENTER = [43.4445, -71.6487]
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
 
 function getStatusStyle(name) {
   const s = (name || '').toLowerCase()
@@ -83,7 +82,7 @@ function RoadWatch() {
         description,
         latitude,
         longitude,
-        statuses ( name ),
+        statuses ( name, is_closing ),
         issue_types ( name )
       `)
       .eq('is_91a', false)
@@ -97,8 +96,7 @@ function RoadWatch() {
   }
 
   const filteredCases = cases.filter(c => {
-    const statusName = (c.statuses?.name || '').toLowerCase()
-    const isClosed = closedStatuses.includes(statusName)
+    const isClosed = Boolean(c.statuses?.is_closing)
     if (statusFilter === 'open' && isClosed) return false
     if (statusFilter === 'closed' && !isClosed) return false
     if (typeFilter !== 'all' && c.issue_types?.name !== typeFilter) return false
@@ -109,7 +107,7 @@ function RoadWatch() {
   const inProgressCount = cases.filter(c =>
     ['assigned', 'scheduled', 'in progress'].includes((c.statuses?.name || '').toLowerCase())
   ).length
-  const closedCount = cases.filter(c => closedStatuses.includes((c.statuses?.name || '').toLowerCase())).length
+  const closedCount = cases.filter(c => c.statuses?.is_closing).length
 
   const avgDaysToRepair = (() => {
     const resolved = cases.filter(c => {

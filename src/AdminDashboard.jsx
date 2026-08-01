@@ -279,8 +279,6 @@ function daysSince(dateStr) {
   return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
-const closedStatuses = ['resolved', 'closed', 'unfounded', 'referred to another department', 'lacks resources to resolve', 'request abandoned']
-
 function AdminDashboard({ onViewCase, refreshKey }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -317,9 +315,9 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       .select(`
         id, case_number, date_submitted, location, description, is_91a,
         followup_due_date, closed_date,
-        statuses ( name ),
+        statuses ( name, is_closing ),
         issue_types ( name ),
-        case_departments ( departments ( name ), statuses ( name ) )
+        case_departments ( departments ( name ), statuses ( name, is_closing ) )
       `)
       .order('date_submitted', { ascending: false })
     if (!error) setCases(data || [])
@@ -335,7 +333,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
     const { data: openCases } = await supabase
       .from('cases')
-      .select('id, date_submitted, status_id, statuses ( name )')
+      .select('id, date_submitted, status_id, statuses ( name, is_closing )')
 
     const { data: allComments } = await supabase
       .from('case_comments')
@@ -348,7 +346,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
     const openCaseIds = new Set(
       openCases
-        .filter(c => !closedStatuses.includes((c.statuses?.name || '').toLowerCase()))
+        .filter(c => !c.statuses?.is_closing)
         .map(c => c.id)
     )
 
@@ -392,7 +390,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
     const { data: allCases } = await supabase
       .from('cases')
-      .select('id, case_number, date_submitted, closed_date, location, description, statuses ( name ), issue_types ( name )')
+      .select('id, case_number, date_submitted, closed_date, location, description, statuses ( name, is_closing ), issue_types ( name )')
 
     const { data: allComments } = await supabase
       .from('case_comments')
@@ -420,7 +418,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       const c = allCases?.find(x => x.id === cd.case_id)
       if (!c) return
       if (new Date(c.date_submitted) >= startOfYear) deptSummary[deptName].ytd++
-      const isOpen = !closedStatuses.includes((c.statuses?.name || '').toLowerCase())
+      const isOpen = !c.statuses?.is_closing
       if (isOpen) deptSummary[deptName].open++
       if (!isOpen && c.date_submitted && c.closed_date) {
         const days = Math.round((new Date(c.closed_date) - new Date(c.date_submitted)) / (1000 * 60 * 60 * 24))
@@ -441,7 +439,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       const deptName = cd.departments?.name
       const c = allCases?.find(x => x.id === cd.case_id)
       if (!c) return
-      const isOpen = !closedStatuses.includes((c.statuses?.name || '').toLowerCase())
+      const isOpen = !c.statuses?.is_closing
       if (!isOpen) return
       const comments = commentsByCaseId[c.id] || []
       const lastComment = comments.length > 0 ? new Date(comments[0].created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
@@ -578,8 +576,7 @@ ${Object.keys(deptSummary).map(dept => {
   }
 
   const filteredCases = cases.filter(c => {
-    const statusName = (c.statuses?.name || '').toLowerCase()
-    const isOpen = !closedStatuses.includes(statusName)
+    const isOpen = !c.statuses?.is_closing
     if (statusFilter === 'open' && !isOpen) return false
     if (statusFilter === 'closed' && isOpen) return false
     if (deptFilter !== 'all') {
@@ -597,7 +594,7 @@ ${Object.keys(deptSummary).map(dept => {
     return true
   })
 
-  const openCases = cases.filter(c => !closedStatuses.includes((c.statuses?.name || '').toLowerCase()))
+  const openCases = cases.filter(c => !c.statuses?.is_closing)
   const upcomingFollowups = cases.filter(c => {
     if (!c.followup_due_date) return false
     const days = daysUntil(c.followup_due_date)
@@ -749,8 +746,7 @@ ${Object.keys(deptSummary).map(dept => {
                   <td style={styles.td}>
                     {c.case_departments?.length > 0
                       ? c.case_departments.map((cd, i) => {
-                          const deptStatusName = (cd.statuses?.name || '').toLowerCase()
-                          const isClosed = closedStatuses.includes(deptStatusName)
+                          const isClosed = Boolean(cd.statuses?.is_closing)
                           return (
                             <span key={i} style={isClosed ? styles.deptTagClosed : styles.deptTag}>
                               {cd.departments?.name}{isClosed ? ' ✓' : ''}
