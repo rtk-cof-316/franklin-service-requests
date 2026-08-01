@@ -15,6 +15,91 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
   const supabaseUrl = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 
+  // ─── Auto-Assign Department on Submission ─────────────────────────
+  // Runs with the service role key because the public submission form uses the anon
+  // role, which RLS deliberately keeps out of case_departments/case_audit_log so
+  // arbitrary visitors can't write department assignments or audit entries directly.
+  if (body.type === 'auto_assign_department') {
+    const { caseId, departmentId, issueTypeName, caseNumber, location, description } = body
+    const authHeaders = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` }
+
+    const [deptRes, statusRes] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/departments?id=eq.${departmentId}&select=name`, { headers: authHeaders }),
+      fetch(`${supabaseUrl}/rest/v1/statuses?name=eq.Received&select=id`, { headers: authHeaders }),
+    ])
+    const departmentName = (await deptRes.json())?.[0]?.name
+    const receivedStatusId = (await statusRes.json())?.[0]?.id
+
+    await fetch(`${supabaseUrl}/rest/v1/case_departments`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        case_id: caseId,
+        department_id: departmentId,
+        status_id: receivedStatusId,
+        status_changed_at: new Date().toISOString(),
+      }),
+    })
+    await fetch(`${supabaseUrl}/rest/v1/case_audit_log`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        case_id: caseId,
+        action: `Auto-assigned to ${departmentName || 'department'} based on issue type "${issueTypeName}"`,
+        performed_by: 'System (auto-routing)',
+        created_at: new Date().toISOString(),
+      }),
+    })
+
+    const emails = await resolveDepartmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
+    const results = []
+    for (const email of emails) {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+          to: [{ email }],
+          subject: `New Case Assigned — Case #${caseNumber}`,
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #1a56a0; padding: 24px 32px;">
+                <h1 style="color: #e8eef6; margin: 0; font-size: 20px;">City of Franklin, NH</h1>
+                <p style="color: #93afd4; margin: 4px 0 0 0; font-size: 13px;">Case Assignment Notification</p>
+              </div>
+              <div style="padding: 32px; border: 1px solid #e5e7eb;">
+                <p style="font-size: 15px; color: #111827;">A new service request has been automatically assigned to <strong>${departmentName}</strong> based on its issue type (${issueTypeName}).</p>
+                <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 16px; margin: 20px 0;">
+                  <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px;">Case Number</div>
+                  <div style="font-size: 28px; font-weight: 700; color: #1a56a0;">#${caseNumber}</div>
+                </div>
+                <p style="font-size: 14px; color: #374151;"><strong>Location:</strong> ${location || '—'}</p>
+                <p style="font-size: 14px; color: #374151;"><strong>Description:</strong> ${description}</p>
+                <div style="margin: 24px 0;">
+                  <a href="https://franklin-service-requests-39a5.vercel.app" style="background-color: #1a56a0; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                    Log In to View Your Cases
+                  </a>
+                </div>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                  <strong>Please do not reply to this email.</strong> This is an automated notification. Log in to the staff portal to update the case status or add notes.
+                </div>
+              </div>
+              <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
+                City of Franklin, New Hampshire &nbsp;|&nbsp; Service Request System
+              </div>
+            </div>
+          `,
+        }),
+      })
+      const data = await res.json()
+      results.push(data)
+    }
+    return new Response(JSON.stringify({ success: true, departmentName, results }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   // ─── Department Assignment Notification ───────────────────────────
   if (body.type === 'department_assignment') {
     const { departmentId, caseNumber, location, description, departmentName } = body

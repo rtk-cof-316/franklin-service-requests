@@ -76,6 +76,7 @@ async function logAudit(caseId, action, performedBy) {
 const DELIVERY_METHODS = ['City USB', 'Self USB', 'In Person Viewing', 'Print', 'Mailed', 'Hold for Pick Up']
 const APPOINTMENT_METHODS = ['City USB', 'Self USB', 'In Person Viewing', 'Print']
 const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
+const REFERRED_STATUS_NAME = 'Referred to Another Department'
 
 function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onPrintWorkOrder, onPrintCaseDetail }) {
   const [caseData, setCaseData] = useState(null)
@@ -108,6 +109,8 @@ function CaseDetail({ caseId, onBack, userEmail, userRole, userDepartmentId, onP
   const [deptSelectedStatus, setDeptSelectedStatus] = useState('')
   const [savingDeptStatus, setSavingDeptStatus] = useState(false)
   const [deptSaveSuccess, setDeptSaveSuccess] = useState(false)
+  const [referTargetDept, setReferTargetDept] = useState('')
+  const [adminReferTargetDept, setAdminReferTargetDept] = useState({})
 
   const [newNote, setNewNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
@@ -327,9 +330,13 @@ const [savingArchive, setSavingArchive] = useState(false)
   }
 
   async function handleSaveDeptStatusAdmin(cdId, deptName) {
-    setSavingDeptId(cdId)
     const newStatusId = parseInt(deptStatusEdits[cdId])
     const newStatusName = allStatuses.find(s => s.id === newStatusId)?.name
+    if (newStatusName === REFERRED_STATUS_NAME && !adminReferTargetDept[cdId]) {
+      alert('Please select which department this case is being referred to.')
+      return
+    }
+    setSavingDeptId(cdId)
     const oldStatusName = caseData.case_departments?.find(cd => cd.id === cdId)?.statuses?.name
     const statusChanged = Boolean(newStatusName && newStatusName !== oldStatusName)
     const updatePayload = { status_id: newStatusId }
@@ -338,6 +345,10 @@ const [savingArchive, setSavingArchive] = useState(false)
     if (!error) {
       if (statusChanged) {
         await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
+      }
+      if (statusChanged && newStatusName === REFERRED_STATUS_NAME && adminReferTargetDept[cdId]) {
+        await referCaseToDepartment(parseInt(adminReferTargetDept[cdId]), deptName)
+        setAdminReferTargetDept(prev => ({ ...prev, [cdId]: '' }))
       }
       await loadCase()
       await loadAuditLog()
@@ -350,6 +361,11 @@ const [savingArchive, setSavingArchive] = useState(false)
     if (selectedStatusIsClosing && followupDate) {
       alert('Please clear the follow-up due date before closing this case.')
       setSavingDeptStatus(false)
+      return
+    }
+    const selectedStatusName = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
+    if (selectedStatusName === REFERRED_STATUS_NAME && !referTargetDept) {
+      alert('Please select which department you are referring this case to.')
       return
     }
     if (!myDeptAssignment) return
@@ -393,6 +409,10 @@ const [savingArchive, setSavingArchive] = useState(false)
       } catch (e) {
         console.error('Admin dept closed notification error:', e)
       }
+    }
+    if (statusChanged && newStatus === REFERRED_STATUS_NAME && referTargetDept) {
+      await referCaseToDepartment(parseInt(referTargetDept), myDeptAssignment.departments?.name)
+      setReferTargetDept('')
     }
     setDeptSaveSuccess(true)
     await loadCase()
@@ -467,6 +487,20 @@ const [savingArchive, setSavingArchive] = useState(false)
     await loadComments()
     await loadAuditLog()
     setSavingComment(false)
+  }
+
+  async function referCaseToDepartment(targetDeptId, fromDeptName) {
+    const targetDeptName = departments.find(d => d.id === targetDeptId)?.name
+    const defaultStatus = allStatuses.find(s => s.name === 'Received')
+    await supabase.from('case_departments').insert([{ case_id: caseId, department_id: targetDeptId, status_id: defaultStatus?.id || allStatuses[0]?.id }])
+    await logAudit(caseId, `Referred from ${fromDeptName} to ${targetDeptName}`, userEmail)
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ type: 'department_assignment', departmentId: targetDeptId, caseNumber: caseData.case_number, location: caseData.location, description: caseData.description, departmentName: targetDeptName }),
+      })
+    } catch (e) { console.error('Referral notification error:', e) }
   }
 
   async function handleAddDept() {
@@ -1021,6 +1055,15 @@ async function handleArchiveCheckbox(field, value, label) {
                   <option value="">-- Select status --</option>
                   {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
+                {allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name === REFERRED_STATUS_NAME && (
+                  <>
+                    <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Refer To Department</div>
+                    <select style={styles.select} value={referTargetDept} onChange={e => setReferTargetDept(e.target.value)}>
+                      <option value="">-- Select department --</option>
+                      {availableDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </>
+                )}
                 <div style={{ ...styles.fieldLabel, marginBottom: '4px' }}>Follow-up Due Date</div>
                 <div style={styles.inputHint}>Clear this date to remove from follow-up tracking</div>
                 <input type="date" style={styles.input} value={followupDate} onChange={e => setFollowupDate(e.target.value)} />
@@ -1046,22 +1089,34 @@ async function handleArchiveCheckbox(field, value, label) {
                       {cd.departments?.name}
                     </div>
                     {isAdmin ? (
-                      <div style={{ display: 'flex', gap: '6px', width: '100%', marginTop: '4px' }}>
-                        <select
-                          style={{ ...styles.select, marginBottom: 0, flex: 1, fontSize: '12px', padding: '5px 8px' }}
-                          value={deptStatusEdits[cd.id] || ''}
-                          onChange={e => setDeptStatusEdits(prev => ({ ...prev, [cd.id]: e.target.value }))}
-                        >
-                          <option value="">-- Status --</option>
-                          {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <button
-                          style={{ padding: '5px 10px', backgroundColor: savingDeptId === cd.id ? '#93afd4' : '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                          onClick={() => handleSaveDeptStatusAdmin(cd.id, cd.departments?.name)}
-                          disabled={savingDeptId === cd.id}
-                        >
-                          {savingDeptId === cd.id ? '...' : 'Save'}
-                        </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                          <select
+                            style={{ ...styles.select, marginBottom: 0, flex: 1, fontSize: '12px', padding: '5px 8px' }}
+                            value={deptStatusEdits[cd.id] || ''}
+                            onChange={e => setDeptStatusEdits(prev => ({ ...prev, [cd.id]: e.target.value }))}
+                          >
+                            <option value="">-- Status --</option>
+                            {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                          <button
+                            style={{ padding: '5px 10px', backgroundColor: savingDeptId === cd.id ? '#93afd4' : '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            onClick={() => handleSaveDeptStatusAdmin(cd.id, cd.departments?.name)}
+                            disabled={savingDeptId === cd.id}
+                          >
+                            {savingDeptId === cd.id ? '...' : 'Save'}
+                          </button>
+                        </div>
+                        {allStatuses.find(s => s.id === parseInt(deptStatusEdits[cd.id]))?.name === REFERRED_STATUS_NAME && (
+                          <select
+                            style={{ ...styles.select, marginBottom: 0, fontSize: '12px', padding: '5px 8px' }}
+                            value={adminReferTargetDept[cd.id] || ''}
+                            onChange={e => setAdminReferTargetDept(prev => ({ ...prev, [cd.id]: e.target.value }))}
+                          >
+                            <option value="">-- Refer to department --</option>
+                            {availableDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          </select>
+                        )}
                       </div>
                     ) : (
                       <span style={styles.deptStatus}>{cd.statuses?.name}</span>
