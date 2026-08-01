@@ -570,6 +570,11 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
                         <span>Citywide: {perf.citywideMedian}d</span>
                       </div>
                     )}
+                    {perf.deptClosedCount > perf.deptMeasuredCount && (
+                      <div style={styles.perfCardFootnote}>
+                        Based on {perf.deptMeasuredCount} of {perf.deptClosedCount} closed cases with a recorded assignment and closure date — the rest predate that being tracked.
+                      </div>
+                    )}
                     <div style={styles.perfCardFootnote}>
                       Faster resolution means residents get their issues addressed sooner, which builds public confidence in city services.
                     </div>
