@@ -540,6 +540,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
             <div style={styles.perfCardLabel}>Open Cases</div>
             <div style={styles.perfCardValue}>{openCases.length}</div>
             <div style={styles.perfCardSub}>Your department's active cases</div>
+            <div style={styles.perfCardFootnote}>
+              Keeping an eye on your active caseload helps catch cases that need attention before they go quiet too long or become overdue.
+            </div>
           </div>
 
           {perf && perf.hasData && (
@@ -550,6 +553,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
                 {perf.volumeSharePct !== null && (
                   <div style={styles.perfCardSub}>{perf.volumeSharePct}% of all {perf.citywideCaseCount} cases received by the City this year</div>
                 )}
+                <div style={styles.perfCardFootnote}>
+                  Seeing your share of citywide volume puts your workload in context and helps support conversations about staffing and resources.
+                </div>
               </div>
 
               <div style={styles.perfCard}>
@@ -564,6 +570,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
                         <span>Citywide: {perf.citywideMedian}d</span>
                       </div>
                     )}
+                    <div style={styles.perfCardFootnote}>
+                      Faster resolution means residents get their issues addressed sooner, which builds public confidence in city services.
+                    </div>
                   </>
                 ) : (
                   <div style={styles.perfNoData}>Not enough closed cases yet</div>
