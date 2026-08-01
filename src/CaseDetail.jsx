@@ -515,23 +515,6 @@ async function handleArchiveCheckbox(field, value, label) {
     } catch (e) { alert('Geocoding failed. Please try again.') }
   }
 
-  async function handleSendReminder(deptId, deptName) {
-    const lastUpdate = auditLog.find(e => e.action?.includes(deptName))
-    const lastUpdateText = lastUpdate
-      ? `Last update from ${deptName}: ${formatDateTime(lastUpdate.created_at)}`
-      : `No updates have been logged by ${deptName}`
-    try {
-      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ type: 'department_reminder', departmentId: deptId, caseNumber: caseData.case_number, location: caseData.location, description: caseData.description, departmentName: deptName, lastUpdateText }),
-      })
-      await supabase.from('case_audit_log').insert([{ case_id: caseId, action: `System reminder sent to ${deptName}`, performed_by: 'System Notification', created_at: new Date().toISOString() }])
-      await loadAuditLog()
-      alert(`Reminder sent to ${deptName}.`)
-    } catch (e) { alert('Failed to send reminder. Please try again.') }
-  }
-
   async function handleAddTimeLog() {
     if (!timeMinutes || !timeInitials || !timeRate) return
     setSavingTimeLog(true)
@@ -1078,13 +1061,6 @@ async function handleArchiveCheckbox(field, value, label) {
                           disabled={savingDeptId === cd.id}
                         >
                           {savingDeptId === cd.id ? '...' : 'Save'}
-                        </button>
-                        <button
-                          style={{ padding: '5px 10px', backgroundColor: '#ffffff', border: '1px solid #d97706', color: '#d97706', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                          onClick={() => handleSendReminder(cd.department_id, cd.departments?.name)}
-                          title="Send system reminder to this department"
-                        >
-                          🔔 Remind
                         </button>
                       </div>
                     ) : (
