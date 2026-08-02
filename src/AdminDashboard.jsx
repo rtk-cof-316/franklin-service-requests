@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
+
+const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 
 const styles = {
   page: {
@@ -290,6 +293,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
   const [accountability, setAccountability] = useState([])
   const [accountabilityLoading, setAccountabilityLoading] = useState(true)
   const [exportingReport, setExportingReport] = useState(false)
+  const [exportingTimeline, setExportingTimeline] = useState(false)
 
   useEffect(() => {
     loadCases()
@@ -378,6 +382,29 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     const sorted = Object.values(deptMap).sort((a, b) => b.over_7_days - a.over_7_days)
     setAccountability(sorted)
     setAccountabilityLoading(false)
+  }
+
+  async function handleExportTimeline() {
+    setExportingTimeline(true)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/export-case-timeline`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({}),
+      })
+      const rows = await res.json()
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Case Timeline')
+      XLSX.writeFile(wb, `case-timeline-review-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    } catch (e) {
+      console.error('Timeline export error:', e)
+      alert('Export failed. Please try again.')
+    }
+    setExportingTimeline(false)
   }
 
   async function handleExportReport() {
@@ -645,13 +672,22 @@ ${Object.keys(deptSummary).map(dept => {
             <div style={styles.tableTitle}>📊 Department Accountability</div>
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Open cases · public comment status · cases silent for 7+ days</div>
           </div>
-          <button
-            style={styles.exportBtn}
-            onClick={handleExportReport}
-            disabled={exportingReport}
-          >
-            {exportingReport ? 'Generating...' : '📄 Export Report for City Manager'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              style={styles.exportBtn}
+              onClick={handleExportTimeline}
+              disabled={exportingTimeline}
+            >
+              {exportingTimeline ? 'Generating...' : '📅 Export Case Timeline for Review'}
+            </button>
+            <button
+              style={styles.exportBtn}
+              onClick={handleExportReport}
+              disabled={exportingReport}
+            >
+              {exportingReport ? 'Generating...' : '📄 Export Report for City Manager'}
+            </button>
+          </div>
         </div>
         {accountabilityLoading ? (
           <div style={styles.loading}>Loading...</div>

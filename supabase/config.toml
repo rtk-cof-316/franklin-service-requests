@@ -26,3 +26,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/department-performance/deno.json"
 entrypoint = "./functions/department-performance/index.ts"
+
+[functions.export-case-timeline]
+enabled = true
+verify_jwt = false
+import_map = "./functions/export-case-timeline/deno.json"
+entrypoint = "./functions/export-case-timeline/index.ts"
