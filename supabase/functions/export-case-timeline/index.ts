@@ -85,6 +85,19 @@ Deno.serve(async (req) => {
     return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / (1000 * 60 * 60 * 24))
   }
 
+  // A negative day count means the "later" timestamp is chronologically before the "earlier"
+  // one -- impossible for anything the app itself wrote, but it shows up on bulk-imported rows
+  // whose timestamps were never in real lifecycle order. Null the day count out rather than
+  // display a nonsense negative number, and say so plainly via *_dates_consistent.
+  function daysBetweenIfConsistent(startIso: string | null, endIso: string | null): { days: number | null; consistent: boolean | null } {
+    if (!startIso || !endIso) return { days: null, consistent: null }
+    const days = daysBetween(startIso, endIso)
+    return days < 0 ? { days: null, consistent: false } : { days, consistent: true }
+  }
+
+  const departmentsOnCase = new Map<number, number>()
+  rows.forEach(r => departmentsOnCase.set(r.case_id, (departmentsOnCase.get(r.case_id) || 0) + 1))
+
   const exportRows = rows.map(r => {
     const k = `${r.case_id}:${r.department_id}`
     const dateSubmitted = r.cases?.date_submitted
@@ -93,8 +106,13 @@ Deno.serve(async (req) => {
     const auditAssigned = assignedAtAudit.get(k) || null
     const auditClosed = closedAtAudit.get(k) || null
 
+    const submissionToAssignment = daysBetweenIfConsistent(dateSubmitted, assignedAtDb)
+    const assignmentToCloseDb = daysBetweenIfConsistent(assignedAtDb, closedAtDb)
+    const assignmentToCloseAudit = daysBetweenIfConsistent(auditAssigned || assignedAtDb, auditClosed)
+
     return {
       case_number: r.cases?.case_number,
+      departments_on_this_case: departmentsOnCase.get(r.case_id),
       issue_type: r.cases?.issue_types?.name || '',
       department: departments.find(d => d.id === r.department_id)?.name || '',
       date_submitted: dateSubmitted,
@@ -105,11 +123,12 @@ Deno.serve(async (req) => {
       assigned_at_audit_log: auditAssigned,
       closed_at_db: closedAtDb,
       closed_at_audit_log: auditClosed,
-      days_from_submission_to_assignment: dateSubmitted && assignedAtDb ? daysBetween(dateSubmitted, assignedAtDb) : null,
-      days_from_assignment_to_close_db: assignedAtDb && closedAtDb ? daysBetween(assignedAtDb, closedAtDb) : null,
-      days_from_assignment_to_close_audit: (auditAssigned || assignedAtDb) && auditClosed
-        ? daysBetween(auditAssigned || assignedAtDb, auditClosed)
-        : null,
+      days_from_submission_to_assignment: submissionToAssignment.days,
+      submission_to_assignment_dates_consistent: submissionToAssignment.consistent,
+      days_from_assignment_to_close_db: assignmentToCloseDb.days,
+      assignment_to_close_db_dates_consistent: assignmentToCloseDb.consistent,
+      days_from_assignment_to_close_audit: assignmentToCloseAudit.days,
+      assignment_to_close_audit_dates_consistent: assignmentToCloseAudit.consistent,
     }
   })
 
