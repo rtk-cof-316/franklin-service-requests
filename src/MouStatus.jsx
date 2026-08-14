@@ -153,6 +153,9 @@ function MouStatus() {
               {loading ? 'Checking…' : 'Check Status'}
             </button>
           </form>
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '20px' }}>
+            Lost your submission number or PIN? Email <a href="mailto:bdemers@franklinnh.gov" style={{ color: '#1a56a0' }}>bdemers@franklinnh.gov</a> with your organization name and we'll help you recover it.
+          </p>
         </div>
       </div>
     )

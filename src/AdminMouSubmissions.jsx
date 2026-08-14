@@ -6,7 +6,8 @@ const styles = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' },
   pageTitle: { fontSize: '22px', fontWeight: '700', color: '#1a56a0', margin: 0 },
-  filterRow: { display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' },
+  filterRow: { display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' },
+  searchInput: { padding: '7px 14px', border: '1px solid #d1d5db', borderRadius: '16px', fontSize: '12px', minWidth: '240px', marginLeft: 'auto' },
   filterBtn: (active) => ({
     padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
     border: active ? '1px solid #1a56a0' : '1px solid #d1d5db',
@@ -42,6 +43,7 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('active')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     load()
@@ -52,15 +54,19 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
     const { data } = await supabase
       .from('mou_submissions')
       .select('*')
-      .neq('current_stage', 'org_drafting')
       .order('created_at', { ascending: false })
     setSubmissions(data || [])
     setLoading(false)
   }
 
   const filtered = submissions.filter(sub => {
-    if (filter === 'active') return !['council_decided'].includes(sub.current_stage)
-    if (filter === 'decided') return sub.current_stage === 'council_decided'
+    if (filter === 'active' && sub.current_stage === 'council_decided') return false
+    if (filter === 'decided' && sub.current_stage !== 'council_decided') return false
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      const haystack = `${sub.org_name} ${sub.org_contact_name} ${sub.org_email} ${sub.submission_number}`.toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
     return true
   })
 
@@ -77,6 +83,12 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
         <button style={styles.filterBtn(filter === 'active')} onClick={() => setFilter('active')}>Active</button>
         <button style={styles.filterBtn(filter === 'decided')} onClick={() => setFilter('decided')}>Council Decided</button>
         <button style={styles.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>All</button>
+        <input
+          style={styles.searchInput}
+          placeholder="Search by org name, contact, email, or submission #..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
       {loading ? (
@@ -89,6 +101,7 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
             <tr>
               <th style={styles.th}>Submission #</th>
               <th style={styles.th}>Organization</th>
+              <th style={styles.th}>Contact</th>
               <th style={styles.th}>Stage</th>
               <th style={styles.th}>Submitted</th>
               <th style={styles.th}>Council Date</th>
@@ -101,6 +114,7 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
                 <tr key={sub.id} style={styles.row} onClick={() => onViewSubmission(sub.id)}>
                   <td style={{ ...styles.td, fontWeight: '700', color: '#1a56a0' }}>{sub.submission_number}</td>
                   <td style={styles.td}>{sub.org_name}</td>
+                  <td style={styles.td}>{sub.org_contact_name} · {sub.org_email}</td>
                   <td style={styles.td}>
                     <span style={{ ...styles.badge, backgroundColor: color.bg, color: color.color }}>
                       {MOU_STAGE_LABELS[sub.current_stage] || sub.current_stage}

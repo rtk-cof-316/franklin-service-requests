@@ -31,6 +31,21 @@ const s = {
   actionBox: { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '18px 20px', marginTop: '24px' },
   actionBoxTitle: { fontSize: '13px', fontWeight: '700', color: '#1e40af', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' },
   noAccess: { backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '14px 16px', fontSize: '13px', color: '#991b1b', marginTop: '20px' },
+  contactBox: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '12px 16px', marginBottom: '8px' },
+  pinRevealBox: { backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', padding: '16px 20px', marginBottom: '16px' },
+  pinValue: { fontSize: '24px', fontWeight: '700', color: '#92400e', letterSpacing: '3px' },
+}
+
+async function hashPin(pin) {
+  const data = new TextEncoder().encode(pin)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function generatePin() {
+  const arr = new Uint32Array(1)
+  crypto.getRandomValues(arr)
+  return String(arr[0] % 100000000).padStart(8, '0')
 }
 
 function renderLockedText(text, valuesByKey, fieldsByKey) {
@@ -64,6 +79,8 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
   const [decisionType, setDecisionType] = useState('approved')
   const [reopenStage, setReopenStage] = useState('brenda_review')
   const [working, setWorking] = useState(false)
+  const [newPin, setNewPin] = useState(null)
+  const [resettingPin, setResettingPin] = useState(false)
 
   const role = mouReviewerRole(userEmail)
   const roleName = role === 'brenda' ? MOU_REVIEWERS.brenda.name : role === 'cityManager' ? MOU_REVIEWERS.cityManager.name : userEmail
@@ -100,6 +117,20 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
 
   async function logActivity(action_type, extra = {}) {
     await supabase.from('mou_activity_log').insert([{ submission_id: submissionId, actor_type: 'admin', actor_name: roleName, action_type, ...extra }])
+  }
+
+  async function handleResetPin() {
+    setResettingPin(true)
+    const pin = generatePin()
+    const pinHash = await hashPin(pin)
+    await supabase.from('mou_submissions').update({
+      pin_hash: pinHash,
+      pin_failed_attempts: 0,
+      pin_locked_until: null,
+    }).eq('id', submissionId)
+    await logActivity('pin_reset', { notes: 'PIN reset by admin' })
+    setNewPin(pin)
+    setResettingPin(false)
   }
 
   async function sendMouEmail(type, extra) {
@@ -224,6 +255,25 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
         <h1 style={s.title}>{submission.org_name}</h1>
         <p style={s.subtitle}>{submission.submission_number} · Contact: {submission.org_contact_name} ({submission.org_email})</p>
         <span style={s.badge}>{MOU_STAGE_LABELS[stage] || stage}</span>
+
+        {role && (
+          <div style={s.contactBox}>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+              Lost their submission number or PIN? The submission number is above. PINs are never stored in plain text, so issue a new one and relay it by phone — not email.
+            </span>
+            <button style={s.buttonSecondary} disabled={resettingPin} onClick={handleResetPin}>
+              {resettingPin ? 'Resetting…' : 'Reset PIN'}
+            </button>
+          </div>
+        )}
+
+        {newPin && (
+          <div style={s.pinRevealBox}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#92400e', textTransform: 'uppercase' }}>New PIN — shown once</div>
+            <div style={s.pinValue}>{newPin}</div>
+            <div style={{ fontSize: '12px', color: '#92400e' }}>Relay this to {submission.org_contact_name} by phone. The old PIN no longer works.</div>
+          </div>
+        )}
 
         {!role && (
           <div style={s.noAccess}>
