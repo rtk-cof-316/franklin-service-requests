@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import Landing from './Landing'
 import SubmitForm from './SubmitForm'
 import CaseTracker from './CaseTracker'
 import Login from './Login'
@@ -28,7 +29,7 @@ import PrintMouAgreement from './PrintMouAgreement'
 function App() {
   const [page, setPage] = useState(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('page') || 'submit'
+    return params.get('page') || 'landing'
   })
   const [session, setSession] = useState(null)
   const [userRole, setUserRole] = useState(null)
@@ -68,7 +69,7 @@ function App() {
       clearTimeout(timer)
       timer = setTimeout(async () => {
         await supabase.auth.signOut()
-        setPage('submit')
+        setPage('landing')
         setUserRole(null)
         setUserDepartmentId(null)
         setViewingCaseId(null)
@@ -97,7 +98,7 @@ function App() {
       // Only redirect to dashboard if explicitly told to AND user is on login page or submit page
       if (shouldRedirect) {
         setPage(prev => {
-          if (prev === 'login' || prev === 'submit' || prev === 'track' || prev === 'roads' || prev === 'analytics') {
+          if (prev === 'login' || prev === 'landing' || prev === 'submit' || prev === 'track' || prev === 'roads' || prev === 'analytics') {
             if (data.role === 'admin') return 'admin'
             if (data.role === 'department') return 'department'
           }
@@ -109,7 +110,7 @@ function App() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setPage('submit')
+    setPage('landing')
     setUserRole(null)
     setUserDepartmentId(null)
     setViewingCaseId(null)
@@ -196,10 +197,13 @@ function App() {
     </button>
   )
 
+  const showStaffRow = session && (userRole === 'admin' || userRole === 'department')
+
   return (
     <div>
       {showNav && (
         <div style={{ backgroundColor: '#0f3d7a', padding: '10px 24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {navBtn('landing', 'Home')}
           {navBtn('submit', 'Submit a Request')}
           {navBtn('track', 'Check Status')}
           {navBtn('roads', 'Road Watch')}
@@ -207,11 +211,6 @@ function App() {
           {navBtn('public-input', 'Public Comment')}
           {navBtn('mou-submit', 'Submit an MOU')}
           {navBtn('mou-status', 'Check MOU Status')}
-          {session && userRole === 'admin' && navBtn('admin', 'Admin')}
-          {session && userRole === 'admin' && navBtn('admin-department-view', 'Departments')}
-          {session && userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
-          {session && userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
-          {session && userRole === 'department' && navBtn('department', 'My Cases')}
           <div style={{ marginLeft: 'auto' }}>
             {session ? (
               <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
@@ -226,6 +225,18 @@ function App() {
         </div>
       )}
 
+      {showNav && showStaffRow && (
+        <div style={{ backgroundColor: '#08213f', padding: '8px 24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #1a56a0' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#5b7fad', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Staff Tools</span>
+          {userRole === 'admin' && navBtn('admin', 'Admin')}
+          {userRole === 'admin' && navBtn('admin-department-view', 'Departments')}
+          {userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
+          {userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
+          {userRole === 'department' && navBtn('department', 'My Cases')}
+        </div>
+      )}
+
+      {page === 'landing' && <Landing onNavigate={setPage} />}
       {page === 'submit' && <SubmitForm />}
       {page === 'track' && <CaseTracker />}
       {page === 'roads' && <RoadWatch />}
