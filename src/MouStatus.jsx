@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { SUPABASE_URL, MOU_STAGE_LABELS, MOU_PROGRESS_STEPS } from './mouConfig'
+import { buildFieldsByKey, parseMouLockedText } from './mouTextRender'
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const MAX_FILES = 6
@@ -37,14 +38,12 @@ const s = {
   activityDot: { width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#1a56a0', marginTop: '5px', flexShrink: 0 },
 }
 
-function renderLockedText(text, fieldsByKey) {
-  const parts = text.split(/(\{\{[a-z_]+\}\})/g)
-  return parts.map((part, i) => {
-    const m = part.match(/^\{\{([a-z_]+)\}\}$/)
-    if (!m) return <span key={i}>{part}</span>
-    const value = fieldsByKey[m[1]]
-    return <span key={i} style={s.token}>{value ? value : `[${m[1].replace(/_/g, ' ')}]`}</span>
-  })
+function renderLockedText(text, valuesByKey, fieldsByKey) {
+  return parseMouLockedText(text, valuesByKey, fieldsByKey).map((seg, i) =>
+    seg.type === 'text'
+      ? <span key={i}>{seg.text}</span>
+      : <span key={i} style={s.token}>{seg.displayValue || `[${seg.key.replace(/_/g, ' ')}]`}</span>
+  )
 }
 
 function formatDateTime(dateStr) {
@@ -160,6 +159,7 @@ function MouStatus() {
   }
 
   const { submission, sections, sectionComments, reviewComments, supportingDocuments, activityLog, editable } = data
+  const fieldsByKey = buildFieldsByKey(sections)
   const currentIndex = MOU_PROGRESS_STEPS.indexOf(submission.current_stage === 'org_revision' ? (submission.return_to_stage || 'brenda_review') : submission.current_stage)
 
   return (
@@ -212,7 +212,7 @@ function MouStatus() {
           return (
             <div key={section.id}>
               <div style={{ fontWeight: '700', color: '#374151', fontSize: '14px', marginTop: '18px', marginBottom: '6px' }}>{section.title}</div>
-              <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues)}</div>
+              <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues, fieldsByKey)}</div>
               {editable && (section.field_definitions || []).map(field => {
                 if (field.conditional_on && fieldValues[field.conditional_on] !== 'yes') return null
                 return (

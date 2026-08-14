@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { SUPABASE_URL, MOU_REVIEWERS, MOU_STAGE_LABELS, mouReviewerRole } from './mouConfig'
+import { buildFieldsByKey, parseMouLockedText } from './mouTextRender'
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -32,14 +33,12 @@ const s = {
   noAccess: { backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '14px 16px', fontSize: '13px', color: '#991b1b', marginTop: '20px' },
 }
 
-function renderLockedText(text, fieldsByKey) {
-  const parts = text.split(/(\{\{[a-z_]+\}\})/g)
-  return parts.map((part, i) => {
-    const m = part.match(/^\{\{([a-z_]+)\}\}$/)
-    if (!m) return <span key={i}>{part}</span>
-    const value = fieldsByKey[m[1]]
-    return <span key={i} style={s.token}>{value ? value : `[${m[1].replace(/_/g, ' ')}]`}</span>
-  })
+function renderLockedText(text, valuesByKey, fieldsByKey) {
+  return parseMouLockedText(text, valuesByKey, fieldsByKey).map((seg, i) =>
+    seg.type === 'text'
+      ? <span key={i}>{seg.text}</span>
+      : <span key={i} style={s.token}>{seg.displayValue || `[${seg.key.replace(/_/g, ' ')}]`}</span>
+  )
 }
 
 function formatDateTime(dateStr) {
@@ -210,6 +209,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
   }
 
   const stage = submission.current_stage
+  const fieldsByKey = buildFieldsByKey(sections)
   const canReviewAsBrenda = role === 'brenda' && (stage === 'submitted' || stage === 'brenda_review')
   const canReviewAsCityManager = role === 'cityManager' && stage === 'city_manager_review'
   const canFinalize = role === 'cityManager' && stage === 'city_manager_review'
@@ -238,7 +238,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
           return (
             <div key={section.id}>
               <div style={{ fontWeight: '700', color: '#374151', fontSize: '14px', marginTop: '18px', marginBottom: '6px' }}>{section.title}</div>
-              <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues)}</div>
+              <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues, fieldsByKey)}</div>
               {ownComments.map(c => (
                 <div key={c.id} style={s.orgNote}>Organization's note: "{c.comment_text}"</div>
               ))}

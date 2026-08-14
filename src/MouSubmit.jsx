@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { SUPABASE_URL } from './mouConfig'
+import { buildFieldsByKey, parseMouLockedText } from './mouTextRender'
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const MAX_FILES = 6
@@ -31,14 +32,12 @@ const s = {
   saveHint: { fontSize: '11px', color: '#9ca3af', marginTop: '-10px', marginBottom: '14px' },
 }
 
-function renderLockedText(text, fieldsByKey) {
-  const parts = text.split(/(\{\{[a-z_]+\}\})/g)
-  return parts.map((part, i) => {
-    const m = part.match(/^\{\{([a-z_]+)\}\}$/)
-    if (!m) return <span key={i}>{part}</span>
-    const value = fieldsByKey[m[1]]
-    return <span key={i} style={s.token}>{value ? value : `[${m[1].replace(/_/g, ' ')}]`}</span>
-  })
+function renderLockedText(text, valuesByKey, fieldsByKey) {
+  return parseMouLockedText(text, valuesByKey, fieldsByKey).map((seg, i) =>
+    seg.type === 'text'
+      ? <span key={i}>{seg.text}</span>
+      : <span key={i} style={s.token}>{seg.displayValue || `[${seg.key.replace(/_/g, ' ')}]`}</span>
+  )
 }
 
 function MouSubmit() {
@@ -209,6 +208,7 @@ function MouSubmit() {
   }
 
   // phase === 'filling'
+  const fieldsByKey = buildFieldsByKey(sections)
   return (
     <div style={s.page}>
       <div style={s.card}>
@@ -229,7 +229,7 @@ function MouSubmit() {
         {sections.map(section => (
           <div key={section.id}>
             <div style={s.sectionTitle}>{section.title}</div>
-            <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues)}</div>
+            <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues, fieldsByKey)}</div>
             {(section.field_definitions || []).map(field => {
               if (field.conditional_on && fieldValues[field.conditional_on] !== 'yes') return null
               return (
