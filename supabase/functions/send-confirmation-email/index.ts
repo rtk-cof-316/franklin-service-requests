@@ -5,6 +5,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Shared HTML shell for the MOU module's notification emails — used by all mou_* branches
+// below. The rest of this file's email types were each written in separate phases (which
+// is why they're inlined individually); these seven are all new in the same pass, so
+// factoring out the repeated wrapper avoids seven near-identical copies of the same markup.
+function mouEmailShell(eyebrow: string, headline: string, bodyHtml: string, ctaLabel: string, ctaUrl: string) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #1a56a0; padding: 24px 32px;">
+        <h1 style="color: #e8eef6; margin: 0; font-size: 20px;">City of Franklin, NH</h1>
+        <p style="color: #93afd4; margin: 4px 0 0 0; font-size: 13px;">${eyebrow}</p>
+      </div>
+      <div style="padding: 32px; border: 1px solid #e5e7eb;">
+        <p style="font-size: 15px; color: #111827; font-weight: 600;">${headline}</p>
+        ${bodyHtml}
+        <div style="margin: 24px 0;">
+          <a href="${ctaUrl}" style="background-color: #1a56a0; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+            ${ctaLabel}
+          </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+        <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+          <strong>Please do not reply to this email.</strong> This is an automated notification from the City of Franklin MOU module.
+        </div>
+      </div>
+      <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
+        City of Franklin, New Hampshire &nbsp;|&nbsp; MOU Module
+      </div>
+    </div>
+  `
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -258,6 +289,168 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  // ─── MOU Module Notifications ─────────────────────────────────────
+  const MOU_APP_URL = 'https://franklin-service-requests-39a5.vercel.app/?page=admin-mou-submissions'
+  const MOU_STATUS_URL = 'https://franklin-service-requests-39a5.vercel.app/?page=mou-status'
+
+  if (body.type === 'mou_submitted') {
+    const { submissionNumber, orgName, toEmail, toName } = body
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: toEmail, name: toName }],
+        subject: `New MOU Submission — ${submissionNumber}`,
+        htmlContent: mouEmailShell(
+          'New MOU Submission',
+          `A new MOU proposal from ${orgName} is ready for review.`,
+          `<p style="font-size: 14px; color: #374151;"><strong>Submission Number:</strong> ${submissionNumber}</p>`,
+          'Review in Admin Dashboard', MOU_APP_URL
+        ),
+      }),
+    })
+    return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_org_resubmitted') {
+    const { submissionNumber, orgName, toEmail, toName } = body
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: toEmail, name: toName }],
+        subject: `MOU Resubmitted — ${submissionNumber}`,
+        htmlContent: mouEmailShell(
+          'MOU Resubmitted',
+          `${orgName} has responded and resubmitted their MOU. It's ready for your review again.`,
+          `<p style="font-size: 14px; color: #374151;"><strong>Submission Number:</strong> ${submissionNumber}</p>`,
+          'Review in Admin Dashboard', MOU_APP_URL
+        ),
+      }),
+    })
+    return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_sent_back_to_org') {
+    const { submissionNumber, orgEmail, orgName, notes } = body
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: orgEmail, name: orgName }],
+        subject: `Action Needed on Your MOU Submission — ${submissionNumber}`,
+        htmlContent: mouEmailShell(
+          'Action Needed',
+          `The City has requested changes or clarification on your MOU submission (${submissionNumber}).`,
+          `${notes ? `<p style="font-size: 14px; color: #374151;"><strong>Note from the City:</strong> ${notes}</p>` : ''}
+           <p style="font-size: 14px; color: #374151;">Use your submission number and PIN to review the request, make updates, and resubmit.</p>`,
+          'Check Status & Update', MOU_STATUS_URL
+        ),
+      }),
+    })
+    return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_pushed_to_city_manager') {
+    const { submissionNumber, orgName } = body
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' }],
+        subject: `MOU Ready for Your Review — ${submissionNumber}`,
+        htmlContent: mouEmailShell(
+          'City Manager Review',
+          `The MOU submission from ${orgName} has cleared initial review and is ready for your review.`,
+          `<p style="font-size: 14px; color: #374151;"><strong>Submission Number:</strong> ${submissionNumber}</p>`,
+          'Review in Admin Dashboard', MOU_APP_URL
+        ),
+      }),
+    })
+    return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_sent_back_to_brenda') {
+    const { submissionNumber, orgName } = body
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' }],
+        subject: `MOU Sent Back for Your Review — ${submissionNumber}`,
+        htmlContent: mouEmailShell(
+          'Sent Back for Your Review',
+          `The City Manager has sent the MOU submission from ${orgName} back to you.`,
+          `<p style="font-size: 14px; color: #374151;"><strong>Submission Number:</strong> ${submissionNumber}</p>`,
+          'Review in Admin Dashboard', MOU_APP_URL
+        ),
+      }),
+    })
+    return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_finalized') {
+    const { submissionNumber, orgName } = body
+    const results = []
+    for (const to of [{ email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' }, { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' }]) {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+          to: [to],
+          subject: `MOU Finalized — ${submissionNumber}`,
+          htmlContent: mouEmailShell(
+            'MOU Finalized',
+            `The MOU with ${orgName} (${submissionNumber}) has been finalized. The agreement text is now locked for export and ready to schedule for City Council.`,
+            '',
+            'View in Admin Dashboard', MOU_APP_URL
+          ),
+        }),
+      })
+      results.push(await res.json())
+    }
+    return new Response(JSON.stringify({ success: true, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_council_decision') {
+    const { submissionNumber, orgName, orgEmail, decision, notifyOrg } = body
+    const decisionLabel = decision === 'approved' ? 'Approved' : decision === 'disapproved' ? 'Disapproved' : 'Sent Back for Edits'
+    const recipients = [
+      { email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' },
+      { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' },
+    ]
+    if (notifyOrg && orgEmail) recipients.push({ email: orgEmail, name: orgName })
+    const results = []
+    for (const to of recipients) {
+      const isOrg = to.email === orgEmail
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+          to: [to],
+          subject: `City Council Decision: ${decisionLabel} — ${submissionNumber}`,
+          htmlContent: mouEmailShell(
+            'City Council Decision',
+            `City Council has recorded a decision on the MOU with ${orgName}: ${decisionLabel}.`,
+            decision === 'sent_back_for_edits'
+              ? `<p style="font-size: 14px; color: #374151;">${isOrg ? 'This submission has been reopened for another round of edits. Use your submission number and PIN to review what changed and update accordingly.' : 'The submission has been reopened for another round of review.'}</p>`
+              : '',
+            isOrg ? 'Check Status' : 'View in Admin Dashboard', isOrg ? MOU_STATUS_URL : MOU_APP_URL
+          ),
+        }),
+      })
+      results.push(await res.json())
+    }
+    return new Response(JSON.stringify({ success: true, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
   // ─── Original Case Confirmation Email ────────────────────────────

@@ -18,6 +18,12 @@ import PublicInputSubmit from './PublicInputSubmit'
 import AdminTopics from './AdminTopics'
 import AdminModeration from './AdminModeration'
 import AdminDepartmentView from './AdminDepartmentView'
+import MouSubmit from './MouSubmit'
+import MouStatus from './MouStatus'
+import AdminMouSubmissions from './AdminMouSubmissions'
+import MouSubmissionDetail from './MouSubmissionDetail'
+import AdminMouTemplates from './AdminMouTemplates'
+import PrintMouAgreement from './PrintMouAgreement'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -32,6 +38,7 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [bulkPrintIds, setBulkPrintIds] = useState([])
   const [viewingTopicId, setViewingTopicId] = useState(null)
+  const [viewingMouSubmissionId, setViewingMouSubmissionId] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -155,7 +162,17 @@ function App() {
     setPage('print-public-input-analysis')
   }
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis'].includes(page)
+  function handleViewMouSubmission(submissionId) {
+    setViewingMouSubmissionId(submissionId)
+    setPage('mou-detail')
+  }
+
+  function handlePrintMouAgreement(submissionId) {
+    setViewingMouSubmissionId(submissionId)
+    setPage('print-mou-agreement')
+  }
+
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement'].includes(page)
 
   const navBtn = (target, label) => (
     <button
@@ -188,9 +205,12 @@ function App() {
           {navBtn('roads', 'Road Watch')}
           {navBtn('analytics', 'City Analytics')}
           {navBtn('public-input', 'Public Comment')}
+          {navBtn('mou-submit', 'Submit an MOU')}
+          {navBtn('mou-status', 'Check MOU Status')}
           {session && userRole === 'admin' && navBtn('admin', 'Admin')}
           {session && userRole === 'admin' && navBtn('admin-department-view', 'Departments')}
           {session && userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
+          {session && userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
           {session && userRole === 'department' && navBtn('department', 'My Cases')}
           <div style={{ marginLeft: 'auto' }}>
             {session ? (
@@ -230,6 +250,23 @@ function App() {
           onBack={() => setPage('public-input-detail')}
           onSubmitted={() => setPage('public-input-detail')}
         />
+      )}
+      {page === 'mou-submit' && <MouSubmit />}
+      {page === 'mou-status' && <MouStatus />}
+      {page === 'admin-mou-submissions' && session && userRole === 'admin' && (
+        <AdminMouSubmissions onViewSubmission={handleViewMouSubmission} onEditTemplate={() => setPage('admin-mou-templates')} />
+      )}
+      {page === 'admin-mou-templates' && session && userRole === 'admin' && <AdminMouTemplates />}
+      {page === 'mou-detail' && session && viewingMouSubmissionId && (
+        <MouSubmissionDetail
+          submissionId={viewingMouSubmissionId}
+          userEmail={session.user.email}
+          onBack={() => setPage('admin-mou-submissions')}
+          onPrint={handlePrintMouAgreement}
+        />
+      )}
+      {page === 'print-mou-agreement' && session && viewingMouSubmissionId && (
+        <PrintMouAgreement submissionId={viewingMouSubmissionId} onClose={() => setPage('mou-detail')} />
       )}
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (
