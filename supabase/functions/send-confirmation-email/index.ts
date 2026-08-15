@@ -36,6 +36,34 @@ function mouEmailShell(eyebrow: string, headline: string, bodyHtml: string, ctaL
   `
 }
 
+// Same shell as mouEmailShell, adapted for the CAR / Agenda / Packet module's notifications.
+function carEmailShell(eyebrow: string, headline: string, bodyHtml: string, ctaLabel: string, ctaUrl: string) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #1a56a0; padding: 24px 32px;">
+        <h1 style="color: #e8eef6; margin: 0; font-size: 20px;">City of Franklin, NH</h1>
+        <p style="color: #93afd4; margin: 4px 0 0 0; font-size: 13px;">${eyebrow}</p>
+      </div>
+      <div style="padding: 32px; border: 1px solid #e5e7eb;">
+        <p style="font-size: 15px; color: #111827; font-weight: 600;">${headline}</p>
+        ${bodyHtml}
+        <div style="margin: 24px 0;">
+          <a href="${ctaUrl}" style="background-color: #1a56a0; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+            ${ctaLabel}
+          </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+        <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+          <strong>Please do not reply to this email.</strong> This is an automated notification from the City of Franklin CAR / Agenda module.
+        </div>
+      </div>
+      <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
+        City of Franklin, New Hampshire &nbsp;|&nbsp; CAR / Agenda Module
+      </div>
+    </div>
+  `
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -502,6 +530,167 @@ Deno.serve(async (req) => {
       results.push(await res.json())
     }
     return new Response(JSON.stringify({ success: true, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  // ─── CAR / Agenda Module Notifications ─────────────────────────────
+  const CAR_ADMIN_URL = 'https://franklin-service-requests-39a5.vercel.app/?page=admin-car'
+  const CAR_STATUS_URL = 'https://franklin-service-requests-39a5.vercel.app/?page=car-status'
+  const CAR_REVIEWERS = [
+    { email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' },
+    { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' },
+  ]
+
+  async function sendCarEmail(to: { email: string; name: string }, subjectLine: string, html: string) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: to.email, name: to.name }],
+        subject: subjectLine,
+        htmlContent: html,
+      }),
+    })
+    return res.json()
+  }
+
+  if (body.type === 'car_submitted') {
+    const { submissionNumber, subject, toEmail, toName } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `CAR Received — ${submissionNumber}`, carEmailShell(
+      'CAR Received',
+      `Your Council Action Report (${submissionNumber}) has been received.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>
+       <p style="font-size: 14px; color: #374151;">It will be reviewed by the City Manager's Office ahead of the next Council meeting cycle's Review Date. Submission of a CAR does not guarantee placement on a Council agenda.</p>`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_new_submission') {
+    const { submissionNumber, subject } = body
+    const results = []
+    for (const to of CAR_REVIEWERS) {
+      results.push(await sendCarEmail(to, `New CAR Submission — ${submissionNumber}`, carEmailShell(
+        'New CAR Submission',
+        `A new Council Action Report has been submitted.`,
+        `<p style="font-size: 14px; color: #374151;"><strong>Submission Number:</strong> ${submissionNumber}</p>
+         <p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+        'Review in Admin Dashboard', CAR_ADMIN_URL
+      )))
+    }
+    return new Response(JSON.stringify({ success: true, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_rejected') {
+    const { submissionNumber, subject, toEmail, toName, reviewNote } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `CAR Not Approved — ${submissionNumber}`, carEmailShell(
+      'Review Decision',
+      `Your Council Action Report (${submissionNumber}) was not approved for the Council agenda.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>
+       ${reviewNote ? `<p style="font-size: 14px; color: #374151;"><strong>Note:</strong> ${reviewNote}</p>` : ''}`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_approved_normal') {
+    const { submissionNumber, subject, toEmail, toName } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `CAR Approved — ${submissionNumber}`, carEmailShell(
+      'Review Decision',
+      `Your Council Action Report (${submissionNumber}) has been approved and will be included in the packet for the upcoming Council meeting.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_approved_hot') {
+    const { submissionNumber, subject, toEmail, toName } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `CAR Approved — Work Session Required — ${submissionNumber}`, carEmailShell(
+      'Review Decision',
+      `Your Council Action Report (${submissionNumber}) has been approved as a "hot button" item and will be scheduled for a Council work session before moving to a packet.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_scheduled_work_session') {
+    const { submissionNumber, subject, toEmail, toName, workSessionDate } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `Work Session Scheduled — ${submissionNumber}`, carEmailShell(
+      'Work Session Scheduled',
+      `Your Council Action Report (${submissionNumber}) has been scheduled for a Council work session${workSessionDate ? ` on ${workSessionDate}` : ''}.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>
+       <p style="font-size: 14px; color: #374151;">A written answer will be requested following the work session.</p>`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_answer_submitted') {
+    const { submissionNumber, subject } = body
+    const results = []
+    for (const to of CAR_REVIEWERS) {
+      results.push(await sendCarEmail(to, `Answer Submitted — ${submissionNumber}`, carEmailShell(
+        'Answer Submitted',
+        `A written answer has been submitted for a work-session CAR and is ready for sign-off.`,
+        `<p style="font-size: 14px; color: #374151;"><strong>Submission Number:</strong> ${submissionNumber}</p>
+         <p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+        'Review in Admin Dashboard', CAR_ADMIN_URL
+      )))
+    }
+    return new Response(JSON.stringify({ success: true, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_answer_signed_off') {
+    const { submissionNumber, subject, toEmail, toName } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `Answer Signed Off — ${submissionNumber}`, carEmailShell(
+      'Answer Signed Off',
+      `Your submitted answer for Council Action Report ${submissionNumber} has been signed off and the CAR will be included in the packet.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_pushed_to_reassignment') {
+    const { submissionNumber, subject, toEmail, toName } = body
+    const recipients = [...CAR_REVIEWERS]
+    if (toEmail) recipients.push({ email: toEmail, name: toName })
+    const results = []
+    for (const to of recipients) {
+      const isSubmitter = to.email === toEmail
+      results.push(await sendCarEmail(to, `Missed Sign-Off Deadline — ${submissionNumber}`, carEmailShell(
+        'Missed Sign-Off Deadline',
+        `Council Action Report ${submissionNumber} missed its sign-off deadline before the Packet Publish Date and needs to be reassigned to a future meeting cycle.`,
+        `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+        isSubmitter ? 'Check Status' : 'Review in Admin Dashboard', isSubmitter ? CAR_STATUS_URL : CAR_ADMIN_URL
+      )))
+    }
+    return new Response(JSON.stringify({ success: true, results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_reassigned') {
+    const { submissionNumber, subject, toEmail, toName, reason } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `CAR Reassigned — ${submissionNumber}`, carEmailShell(
+      'Reassigned to a New Meeting Cycle',
+      `Your Council Action Report (${submissionNumber}) has been reassigned to a different meeting cycle.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>
+       ${reason ? `<p style="font-size: 14px; color: #374151;"><strong>Reason:</strong> ${reason}</p>` : ''}`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'car_packet_published') {
+    const { submissionNumber, subject, toEmail, toName } = body
+    const data = await sendCarEmail({ email: toEmail, name: toName }, `Packet Published — ${submissionNumber}`, carEmailShell(
+      'Packet Published',
+      `The Council meeting packet including your Council Action Report (${submissionNumber}) has been published.`,
+      `<p style="font-size: 14px; color: #374151;"><strong>Subject:</strong> ${subject || '—'}</p>`,
+      'Check Status', CAR_STATUS_URL
+    ))
+    return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
   // ─── Original Case Confirmation Email ────────────────────────────

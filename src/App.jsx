@@ -25,6 +25,16 @@ import AdminMouSubmissions from './AdminMouSubmissions'
 import MouSubmissionDetail from './MouSubmissionDetail'
 import AdminMouTemplates from './AdminMouTemplates'
 import PrintMouAgreement from './PrintMouAgreement'
+import { carAdminRole } from './carConfig'
+import CarSubmit from './CarSubmit'
+import CarStatus from './CarStatus'
+import AdminCarSubmissions from './AdminCarSubmissions'
+import CarSubmissionDetail from './CarSubmissionDetail'
+import AdminCarCycles from './AdminCarCycles'
+import CarCycleDetail from './CarCycleDetail'
+import CarBatchReview from './CarBatchReview'
+import PrintCarAgenda from './PrintCarAgenda'
+import PrintCarPacket from './PrintCarPacket'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -40,6 +50,8 @@ function App() {
   const [bulkPrintIds, setBulkPrintIds] = useState([])
   const [viewingTopicId, setViewingTopicId] = useState(null)
   const [viewingMouSubmissionId, setViewingMouSubmissionId] = useState(null)
+  const [viewingCarSubmissionId, setViewingCarSubmissionId] = useState(null)
+  const [viewingCarCycleId, setViewingCarCycleId] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -173,7 +185,34 @@ function App() {
     setPage('print-mou-agreement')
   }
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement'].includes(page)
+  function handleViewCarSubmission(submissionId) {
+    setViewingCarSubmissionId(submissionId)
+    setPage('car-submission-detail')
+  }
+
+  function handleViewCarCycle(cycleId) {
+    setViewingCarCycleId(cycleId)
+    setPage('car-cycle-detail')
+  }
+
+  function handleBatchReviewCarCycle(cycleId) {
+    setViewingCarCycleId(cycleId)
+    setPage('car-batch-review')
+  }
+
+  function handlePrintCarAgenda(cycleId) {
+    setViewingCarCycleId(cycleId)
+    setPage('print-car-agenda')
+  }
+
+  function handlePrintCarPacket(cycleId) {
+    setViewingCarCycleId(cycleId)
+    setPage('print-car-packet')
+  }
+
+  const isCarAdmin = !!carAdminRole(session?.user?.email)
+
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet'].includes(page)
 
   const navBtn = (target, label) => (
     <button
@@ -197,7 +236,7 @@ function App() {
     </button>
   )
 
-  const showStaffRow = session && (userRole === 'admin' || userRole === 'department')
+  const showStaffRow = session && (userRole === 'admin' || userRole === 'department' || isCarAdmin)
 
   return (
     <div>
@@ -211,6 +250,8 @@ function App() {
           {navBtn('public-input', 'Public Comment')}
           {navBtn('mou-submit', 'Submit an MOU')}
           {navBtn('mou-status', 'Check MOU Status')}
+          {navBtn('car-submit', 'Submit a CAR')}
+          {navBtn('car-status', 'Check CAR Status')}
           <div style={{ marginLeft: 'auto' }}>
             {session ? (
               <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
@@ -232,6 +273,7 @@ function App() {
           {userRole === 'admin' && navBtn('admin-department-view', 'Departments')}
           {userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
           {userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
+          {isCarAdmin && navBtn('admin-car', 'CARs')}
           {userRole === 'department' && navBtn('department', 'My Cases')}
         </div>
       )}
@@ -278,6 +320,35 @@ function App() {
       )}
       {page === 'print-mou-agreement' && session && viewingMouSubmissionId && (
         <PrintMouAgreement submissionId={viewingMouSubmissionId} onClose={() => setPage('mou-detail')} />
+      )}
+      {page === 'car-submit' && <CarSubmit />}
+      {page === 'car-status' && <CarStatus />}
+      {page === 'admin-car' && session && isCarAdmin && (
+        <AdminCarSubmissions onViewSubmission={handleViewCarSubmission} onManageCycles={() => setPage('admin-car-cycles')} />
+      )}
+      {page === 'admin-car-cycles' && session && isCarAdmin && (
+        <AdminCarCycles onViewCycle={handleViewCarCycle} onBack={() => setPage('admin-car')} />
+      )}
+      {page === 'car-cycle-detail' && session && isCarAdmin && viewingCarCycleId && (
+        <CarCycleDetail
+          cycleId={viewingCarCycleId}
+          onBack={() => setPage('admin-car-cycles')}
+          onBatchReview={handleBatchReviewCarCycle}
+          onPrintAgenda={handlePrintCarAgenda}
+          onPrintPacket={handlePrintCarPacket}
+        />
+      )}
+      {page === 'car-batch-review' && session && isCarAdmin && viewingCarCycleId && (
+        <CarBatchReview cycleId={viewingCarCycleId} userEmail={session.user.email} onBack={() => setPage('car-cycle-detail')} />
+      )}
+      {page === 'car-submission-detail' && session && isCarAdmin && viewingCarSubmissionId && (
+        <CarSubmissionDetail submissionId={viewingCarSubmissionId} userEmail={session.user.email} onBack={() => setPage('admin-car')} />
+      )}
+      {page === 'print-car-agenda' && session && isCarAdmin && viewingCarCycleId && (
+        <PrintCarAgenda cycleId={viewingCarCycleId} onClose={() => setPage('car-cycle-detail')} />
+      )}
+      {page === 'print-car-packet' && session && isCarAdmin && viewingCarCycleId && (
+        <PrintCarPacket cycleId={viewingCarCycleId} onClose={() => setPage('car-cycle-detail')} />
       )}
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (

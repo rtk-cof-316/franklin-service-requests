@@ -19,6 +19,8 @@ const MODULES = [
   { page: 'public-input', icon: '💬', title: 'Public Comment', desc: 'Weigh in on active City topics and hearings, or review past comment periods.' },
   { page: 'mou-submit', icon: '🤝', title: 'Submit an MOU', desc: 'Start a Memorandum of Understanding proposal with the City of Franklin.' },
   { page: 'mou-status', icon: '📋', title: 'Check MOU Status', desc: 'Check the status of an MOU proposal using your submission number and PIN.' },
+  { page: 'car-submit', icon: '🏛️', title: 'Submit a CAR', desc: 'Request that an item be placed on a City Council agenda.' },
+  { page: 'car-status', icon: '📄', title: 'Check CAR Status', desc: 'Check the status of a Council Action Report using your submission number and PIN.' },
 ]
 
 function Landing({ onNavigate }) {
