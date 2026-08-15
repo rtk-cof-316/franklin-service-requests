@@ -53,6 +53,7 @@ function App() {
   const [viewingMouSubmissionId, setViewingMouSubmissionId] = useState(null)
   const [viewingCarSubmissionId, setViewingCarSubmissionId] = useState(null)
   const [viewingCarCycleId, setViewingCarCycleId] = useState(null)
+  const [viewingCarWorkSessionId, setViewingCarWorkSessionId] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -201,8 +202,9 @@ function App() {
     setPage('car-batch-review')
   }
 
-  function handlePrintCarAgenda(cycleId) {
+  function handlePrintCarAgenda(cycleId, workSessionId) {
     setViewingCarCycleId(cycleId)
+    setViewingCarWorkSessionId(workSessionId || null)
     setPage('print-car-agenda')
   }
 
@@ -344,6 +346,7 @@ function App() {
           onBack={() => setPage('admin-car-cycles')}
           onBatchReview={handleBatchReviewCarCycle}
           onPrintAgenda={handlePrintCarAgenda}
+          onPrintWorkSessionAgenda={handlePrintCarAgenda}
           onPrintPacket={handlePrintCarPacket}
         />
       )}
@@ -354,7 +357,7 @@ function App() {
         <CarSubmissionDetail submissionId={viewingCarSubmissionId} userEmail={session.user.email} onBack={() => setPage('admin-car')} />
       )}
       {page === 'print-car-agenda' && session && isCarAdmin && viewingCarCycleId && (
-        <PrintCarAgenda cycleId={viewingCarCycleId} onClose={() => setPage('car-cycle-detail')} />
+        <PrintCarAgenda cycleId={viewingCarCycleId} workSessionId={viewingCarWorkSessionId} onClose={() => setPage('car-cycle-detail')} />
       )}
       {page === 'print-car-packet' && session && isCarAdmin && viewingCarCycleId && (
         <PrintCarPacket cycleId={viewingCarCycleId} onClose={() => setPage('car-cycle-detail')} />

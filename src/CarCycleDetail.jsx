@@ -33,7 +33,7 @@ function daysBetween(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000)
 }
 
-function CarCycleDetail({ cycleId, onBack, onBatchReview, onPrintAgenda, onPrintPacket }) {
+function CarCycleDetail({ cycleId, onBack, onBatchReview, onPrintAgenda, onPrintWorkSessionAgenda, onPrintPacket }) {
   const [cycle, setCycle] = useState(null)
   const [workSessions, setWorkSessions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -162,6 +162,7 @@ function CarCycleDetail({ cycleId, onBack, onBatchReview, onPrintAgenda, onPrint
                   <div style={s.wsRow}>
                     <span>Session: {formatDate(ws.session_date)}</span>
                     <span>Answers Due: {formatDate(effectiveDue)}</span>
+                    <span style={{ color: '#1a56a0', cursor: 'pointer', fontWeight: '600' }} onClick={() => onPrintWorkSessionAgenda(cycleId, ws.id)}>Print Agenda →</span>
                   </div>
                   {gap < 5 && (
                     <div style={s.warnBanner}>Only {gap} day{gap === 1 ? '' : 's'} between this session's Answers Due date and the cycle's Packet Publish Date — may be tight.</div>
