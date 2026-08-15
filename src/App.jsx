@@ -29,6 +29,7 @@ import { carAdminRole } from './carConfig'
 import CarSubmit from './CarSubmit'
 import CarStatus from './CarStatus'
 import AdminCarSubmissions from './AdminCarSubmissions'
+import AdminCarCreate from './AdminCarCreate'
 import CarSubmissionDetail from './CarSubmissionDetail'
 import AdminCarCycles from './AdminCarCycles'
 import CarCycleDetail from './CarCycleDetail'
@@ -324,7 +325,15 @@ function App() {
       {page === 'car-submit' && <CarSubmit />}
       {page === 'car-status' && <CarStatus />}
       {page === 'admin-car' && session && isCarAdmin && (
-        <AdminCarSubmissions onViewSubmission={handleViewCarSubmission} onManageCycles={() => setPage('admin-car-cycles')} />
+        <AdminCarSubmissions onViewSubmission={handleViewCarSubmission} onManageCycles={() => setPage('admin-car-cycles')} onCreateCar={() => setPage('admin-car-create')} />
+      )}
+      {page === 'admin-car-create' && session && isCarAdmin && (
+        <AdminCarCreate
+          userEmail={session.user.email}
+          onBack={() => setPage('admin-car')}
+          onViewSubmission={handleViewCarSubmission}
+          onGoToBatchReview={handleBatchReviewCarCycle}
+        />
       )}
       {page === 'admin-car-cycles' && session && isCarAdmin && (
         <AdminCarCycles onViewCycle={handleViewCarCycle} onBack={() => setPage('admin-car')} />

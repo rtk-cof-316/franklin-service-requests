@@ -42,7 +42,7 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function AdminCarSubmissions({ onViewSubmission, onManageCycles }) {
+function AdminCarSubmissions({ onViewSubmission, onManageCycles, onCreateCar }) {
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('active')
@@ -79,7 +79,10 @@ function AdminCarSubmissions({ onViewSubmission, onManageCycles }) {
     <div style={styles.page}>
       <div style={styles.headerRow}>
         <h1 style={styles.pageTitle}>Council Action Reports</h1>
-        <span style={styles.navLink} onClick={onManageCycles}>Manage Meeting Cycles →</span>
+        <div>
+          <span style={{ ...styles.navLink, marginRight: '20px' }} onClick={onCreateCar}>+ Create CAR</span>
+          <span style={styles.navLink} onClick={onManageCycles}>Manage Meeting Cycles →</span>
+        </div>
       </div>
 
       <div style={styles.filterRow}>
