@@ -131,6 +131,57 @@ Deno.serve(async (req) => {
     })
   }
 
+  // ─── Assign Requestor ID ───────────────────────────────────────────
+  // Runs with the service role key for the same reason as auto_assign_department:
+  // RLS blocks the anon role from inserting into requestor_registry or updating
+  // cases.requestor_id, so a direct client-side write silently no-ops. This mirrors
+  // the exact matching logic that used to live in SubmitForm.jsx (case-insensitive
+  // name match against the registry; reuse the existing ID or mint the next one).
+  if (body.type === 'assign_requestor_id') {
+    const { caseId, submitterName } = body
+    const authHeaders = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` }
+    const name = (submitterName || '').trim()
+
+    let requestorId
+    if (name) {
+      const lookupRes = await fetch(
+        `${supabaseUrl}/rest/v1/requestor_registry?requestor_name=ilike.${encodeURIComponent(name)}&select=requestor_id`,
+        { headers: authHeaders }
+      )
+      const existing = (await lookupRes.json())?.[0]
+
+      if (existing) {
+        requestorId = existing.requestor_id
+      } else {
+        const allRes = await fetch(
+          `${supabaseUrl}/rest/v1/requestor_registry?select=requestor_id&order=requestor_id.desc&limit=1`,
+          { headers: authHeaders }
+        )
+        const last = (await allRes.json())?.[0]
+        const lastNum = last?.requestor_id ? parseInt(last.requestor_id.replace('RID', '')) : 0
+        requestorId = `RID${String(lastNum + 1).padStart(4, '0')}`
+
+        await fetch(`${supabaseUrl}/rest/v1/requestor_registry`, {
+          method: 'POST',
+          headers: { ...authHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ requestor_name: name, requestor_id: requestorId }),
+        })
+      }
+    } else {
+      requestorId = 'RID0050'
+    }
+
+    await fetch(`${supabaseUrl}/rest/v1/cases?id=eq.${caseId}`, {
+      method: 'PATCH',
+      headers: { ...authHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ requestor_id: requestorId }),
+    })
+
+    return new Response(JSON.stringify({ success: true, requestorId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   // ─── Department Assignment Notification ───────────────────────────
   if (body.type === 'department_assignment') {
     const { departmentId, caseNumber, location, description, departmentName } = body
