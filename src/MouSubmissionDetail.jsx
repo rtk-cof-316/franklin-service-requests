@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { SUPABASE_URL, MOU_REVIEWERS, MOU_STAGE_LABELS, mouReviewerRole } from './mouConfig'
-import { buildFieldsByKey, parseMouLockedText } from './mouTextRender'
+import { SUPABASE_URL, MOU_REVIEWERS, MOU_STAGE_LABELS, MOU_ORG_REVIEW_DECISION_LABELS, mouReviewerRole } from './mouConfig'
+import { buildFieldsByKey, resolveSectionText } from './mouTextRender'
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const s = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
-  card: { maxWidth: '860px', margin: '0 auto', backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '32px' },
+  card: { maxWidth: '900px', margin: '0 auto', backgroundColor: '#ffffff', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '32px' },
   backLink: { fontSize: '13px', color: '#1a56a0', cursor: 'pointer', marginBottom: '16px', display: 'inline-block' },
   title: { fontSize: '22px', fontWeight: '700', color: '#1a56a0', margin: '0 0 4px 0' },
   subtitle: { fontSize: '14px', color: '#6b7280', margin: '0 0 20px 0' },
-  badge: { display: 'inline-block', padding: '4px 12px', borderRadius: '14px', fontSize: '12px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af', marginBottom: '20px' },
+  badge: { display: 'inline-block', padding: '4px 12px', borderRadius: '14px', fontSize: '12px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af', marginBottom: '20px', marginRight: '10px' },
   sectionTitle: { fontSize: '16px', fontWeight: '700', color: '#1a56a0', marginTop: '24px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '2px solid #e5e7eb' },
-  lockedText: { fontSize: '13px', color: '#374151', lineHeight: 1.7, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '14px 16px', marginBottom: '8px', whiteSpace: 'pre-wrap' },
-  token: { color: '#1a56a0', fontWeight: '600', backgroundColor: '#eff6ff', padding: '0 3px', borderRadius: '3px' },
+  editableText: { width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', color: '#374151', lineHeight: 1.7, boxSizing: 'border-box', minHeight: '90px', fontFamily: 'inherit', resize: 'vertical', marginBottom: '4px' },
+  originalAnswersBox: { fontSize: '12px', color: '#6b7280', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '10px 14px', marginBottom: '8px' },
+  originalAnswerLabel: { fontWeight: '700', color: '#374151' },
+  revertLink: { fontSize: '11px', color: '#991b1b', cursor: 'pointer', fontWeight: '600' },
+  editedMeta: { fontSize: '11px', color: '#9ca3af', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   orgNote: { fontSize: '12px', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 12px', marginBottom: '10px' },
+  reviewBox: { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '16px 20px', marginBottom: '20px' },
+  reviewBoxTitle: { fontSize: '13px', fontWeight: '700', color: '#1e40af', textTransform: 'uppercase', marginBottom: '6px' },
   commentCard: { backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '10px 14px', marginBottom: '8px' },
   commentMeta: { fontSize: '11px', color: '#6b7280', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' },
   visiblePill: { fontSize: '10px', fontWeight: '700', padding: '1px 8px', borderRadius: '10px', backgroundColor: '#d1fae5', color: '#065f46' },
@@ -36,6 +41,11 @@ const s = {
   pinValue: { fontSize: '24px', fontWeight: '700', color: '#92400e', letterSpacing: '3px' },
 }
 
+function formatDateTime(dateStr) {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 async function hashPin(pin) {
   const data = new TextEncoder().encode(pin)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
@@ -48,24 +58,12 @@ function generatePin() {
   return String(arr[0] % 100000000).padStart(8, '0')
 }
 
-function renderLockedText(text, valuesByKey, fieldsByKey) {
-  return parseMouLockedText(text, valuesByKey, fieldsByKey).map((seg, i) =>
-    seg.type === 'text'
-      ? <span key={i}>{seg.text}</span>
-      : <span key={i} style={s.token}>{seg.displayValue || `[${seg.key.replace(/_/g, ' ')}]`}</span>
-  )
-}
-
-function formatDateTime(dateStr) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-
 function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
   const [submission, setSubmission] = useState(null)
   const [sections, setSections] = useState([])
   const [fieldValues, setFieldValues] = useState({})
-  const [sectionComments, setSectionComments] = useState([])
+  const [sectionText, setSectionText] = useState([])
+  const [editedDraft, setEditedDraft] = useState({})
   const [reviewComments, setReviewComments] = useState([])
   const [supportingDocuments, setSupportingDocuments] = useState([])
   const [activityLog, setActivityLog] = useState([])
@@ -76,8 +74,6 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
   const [newCommentVisible, setNewCommentVisible] = useState(false)
   const [sendBackNotes, setSendBackNotes] = useState('')
   const [councilDate, setCouncilDate] = useState('')
-  const [decisionType, setDecisionType] = useState('approved')
-  const [reopenStage, setReopenStage] = useState('brenda_review')
   const [working, setWorking] = useState(false)
   const [newPin, setNewPin] = useState(null)
   const [resettingPin, setResettingPin] = useState(false)
@@ -95,19 +91,26 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
     if (sub) {
       setSubmission(sub)
       setCouncilDate(sub.council_date || '')
-      const [secRes, valRes, cmtRes, revRes, docRes, actRes] = await Promise.all([
+      const [secRes, valRes, textRes, revRes, docRes, actRes] = await Promise.all([
         supabase.from('mou_template_sections').select('*').eq('template_id', sub.template_id).order('section_order'),
         supabase.from('mou_submission_field_values').select('*').eq('submission_id', submissionId),
-        supabase.from('mou_submission_section_comments').select('*').eq('submission_id', submissionId),
+        supabase.from('mou_submission_section_text').select('*').eq('submission_id', submissionId),
         supabase.from('mou_review_comments').select('*').eq('submission_id', submissionId).order('created_at'),
         supabase.from('mou_supporting_documents').select('*').eq('submission_id', submissionId),
         supabase.from('mou_activity_log').select('*').eq('submission_id', submissionId).order('created_at'),
       ])
-      setSections(secRes.data || [])
+      const secList = secRes.data || []
+      setSections(secList)
       const values = {}
       for (const fv of valRes.data || []) values[fv.field_key] = fv.value
       setFieldValues(values)
-      setSectionComments(cmtRes.data || [])
+      const textList = textRes.data || []
+      setSectionText(textList)
+      const fieldsByKey = buildFieldsByKey(secList)
+      const textBySectionId = Object.fromEntries(textList.map(row => [row.template_section_id, row.edited_text]))
+      const draft = {}
+      for (const section of secList) draft[section.id] = resolveSectionText(section, values, fieldsByKey, textBySectionId[section.id])
+      setEditedDraft(draft)
       setReviewComments(revRes.data || [])
       setSupportingDocuments(docRes.data || [])
       setActivityLog(actRes.data || [])
@@ -159,75 +162,82 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
     setWorking(false)
   }
 
+  async function handleSectionTextBlur(sectionId) {
+    const text = editedDraft[sectionId]
+    await supabase.from('mou_submission_section_text').upsert(
+      { submission_id: submissionId, template_section_id: sectionId, edited_text: text, edited_by: roleName, edited_at: new Date().toISOString() },
+      { onConflict: 'submission_id,template_section_id' }
+    )
+    await load()
+  }
+
+  async function handleRevertSection(sectionId) {
+    await supabase.from('mou_submission_section_text').delete().eq('submission_id', submissionId).eq('template_section_id', sectionId)
+    await load()
+  }
+
   async function transitionStage(newStage, patch = {}) {
     setWorking(true)
     await supabase.from('mou_submissions').update({ current_stage: newStage, ...patch }).eq('id', submissionId)
     setWorking(false)
   }
 
+  async function handleSendBack(targetStage) {
+    const note = sendBackNotes || null
+    await transitionStage(targetStage, { return_to_stage: submission.current_stage })
+    await logActivity(targetStage === 'missing_information' ? 'sent_back_missing_information' : 'sent_back_submitter_review', {
+      old_value: submission.current_stage, new_value: targetStage, notes: note,
+    })
+    await sendMouEmail(targetStage === 'missing_information' ? 'mou_sent_back_missing_information' : 'mou_sent_back_submitter_review', {
+      orgEmail: submission.org_email, notes: note,
+    })
+    setSendBackNotes('')
+    await load()
+  }
+
   async function handlePushToCityManager() {
-    await transitionStage('city_manager_review')
-    await logActivity('pushed_to_city_manager', { old_value: submission.current_stage, new_value: 'city_manager_review' })
+    await transitionStage('manager_review_city_manager')
+    await logActivity('pushed_to_city_manager', { old_value: submission.current_stage, new_value: 'manager_review_city_manager' })
     await sendMouEmail('mou_pushed_to_city_manager', {})
     await load()
   }
 
   async function handleSendBackToBrenda() {
-    await transitionStage('brenda_review')
-    await logActivity('sent_back_to_brenda', { old_value: submission.current_stage, new_value: 'brenda_review', notes: sendBackNotes || null })
+    await transitionStage('manager_review_brenda')
+    await logActivity('sent_back_to_brenda', { old_value: submission.current_stage, new_value: 'manager_review_brenda', notes: sendBackNotes || null })
     await sendMouEmail('mou_sent_back_to_brenda', {})
     setSendBackNotes('')
     await load()
   }
 
-  async function handleSendBackToOrg() {
-    const returnTo = submission.current_stage === 'city_manager_review' ? 'city_manager_review' : 'brenda_review'
-    await transitionStage('org_revision', { return_to_stage: returnTo })
-    await logActivity('sent_back_to_org', { old_value: submission.current_stage, new_value: 'org_revision', notes: sendBackNotes || null })
-    await sendMouEmail('mou_sent_back_to_org', { orgEmail: submission.org_email, notes: sendBackNotes || null })
-    setSendBackNotes('')
+  async function handleSendBackToCityManagerReview() {
+    await transitionStage('manager_review_city_manager')
+    await logActivity('sent_back_to_city_manager_review', { old_value: submission.current_stage, new_value: 'manager_review_city_manager' })
+    await sendMouEmail('mou_pushed_to_city_manager', {})
     await load()
   }
 
-  async function handleFinalize() {
-    setWorking(true)
-    await supabase.from('mou_submissions').update({ current_stage: 'finalized', finalized_at: new Date().toISOString() }).eq('id', submissionId)
-    await logActivity('finalized', { old_value: submission.current_stage, new_value: 'finalized' })
-    await sendMouEmail('mou_finalized', {})
-    setWorking(false)
+  async function handleMarkReadyForCouncil() {
+    await transitionStage('ready_for_council')
+    await logActivity('ready_for_council', { old_value: submission.current_stage, new_value: 'ready_for_council' })
+    await sendMouEmail('mou_ready_for_council', {})
     await load()
-  }
-
-  async function handleGoToExport() {
-    if (submission.current_stage === 'finalized') {
-      await supabase.from('mou_submissions').update({ current_stage: 'exported', exported_at: new Date().toISOString() }).eq('id', submissionId)
-      await logActivity('exported', { old_value: 'finalized', new_value: 'exported' })
-    }
-    onPrint(submissionId)
   }
 
   async function handleSaveCouncilDate() {
     if (!councilDate) return
     setWorking(true)
-    const patch = { council_date: councilDate }
-    if (submission.current_stage === 'exported') patch.current_stage = 'scheduled_council'
-    await supabase.from('mou_submissions').update(patch).eq('id', submissionId)
+    await supabase.from('mou_submissions').update({ council_date: councilDate }).eq('id', submissionId)
     await logActivity('council_scheduled', { new_value: councilDate })
     setWorking(false)
     await load()
   }
 
-  async function handleRecordDecision() {
+  async function handleRecordDecision(decision) {
     setWorking(true)
-    const patch = { council_decision: decisionType, council_decision_date: new Date().toISOString().slice(0, 10) }
-    patch.current_stage = decisionType === 'sent_back_for_edits' ? reopenStage : 'council_decided'
-    await supabase.from('mou_submissions').update(patch).eq('id', submissionId)
-    await logActivity('council_decision_recorded', { new_value: decisionType })
-    await sendMouEmail('mou_council_decision', {
-      decision: decisionType,
-      notifyOrg: decisionType === 'sent_back_for_edits',
-      orgEmail: submission.org_email,
-    })
+    await supabase.from('mou_submissions').update({ current_stage: decision }).eq('id', submissionId)
+    await logActivity('council_decision_recorded', { new_value: decision })
+    await sendMouEmail('mou_council_decision', { decision, orgEmail: submission.org_email })
     setWorking(false)
     await load()
   }
@@ -241,12 +251,12 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
 
   const stage = submission.current_stage
   const fieldsByKey = buildFieldsByKey(sections)
-  const canReviewAsBrenda = role === 'brenda' && (stage === 'submitted' || stage === 'brenda_review')
-  const canReviewAsCityManager = role === 'cityManager' && stage === 'city_manager_review'
-  const canFinalize = role === 'cityManager' && stage === 'city_manager_review'
-  const canExport = stage === 'finalized' || stage === 'exported' || stage === 'scheduled_council'
-  const canScheduleCouncil = stage === 'exported' || stage === 'scheduled_council'
-  const canRecordDecision = stage === 'scheduled_council'
+  const textBySectionId = Object.fromEntries(sectionText.map(row => [row.template_section_id, row]))
+  const canReviewAsBrenda = role === 'brenda' && stage === 'manager_review_brenda'
+  const canReviewAsCityManager = role === 'cityManager' && stage === 'manager_review_city_manager'
+  const canMarkReadyForCouncil = role === 'cityManager' && stage === 'manager_review_city_manager'
+  const canScheduleCouncil = stage === 'ready_for_council'
+  const canRecordDecision = stage === 'ready_for_council'
 
   return (
     <div style={s.page}>
@@ -255,6 +265,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
         <h1 style={s.title}>{submission.org_name}</h1>
         <p style={s.subtitle}>{submission.submission_number} · Contact: {submission.org_contact_name} ({submission.org_email})</p>
         <span style={s.badge}>{MOU_STAGE_LABELS[stage] || stage}</span>
+        <button style={s.buttonSecondary} onClick={() => onPrint(submissionId)}>🖨️ Print Agreement</button>
 
         {role && (
           <div style={s.contactBox}>
@@ -281,17 +292,51 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
           </div>
         )}
 
-        <div style={s.sectionTitle}>Submission Contents</div>
+        {submission.org_review_decision && (
+          <div style={s.reviewBox}>
+            <div style={s.reviewBoxTitle}>Submitter's Review</div>
+            <div style={{ fontSize: '13px', color: '#111827', marginBottom: '4px' }}>
+              <strong>{MOU_ORG_REVIEW_DECISION_LABELS[submission.org_review_decision] || submission.org_review_decision}</strong>
+              {submission.org_review_decided_at ? ` · ${formatDateTime(submission.org_review_decided_at)}` : ''}
+            </div>
+            {submission.org_review_comment && <div style={{ fontSize: '13px', color: '#374151' }}>"{submission.org_review_comment}"</div>}
+          </div>
+        )}
+
+        <div style={s.sectionTitle}>Agreement Contents</div>
         {sections.map(section => {
-          const ownComments = sectionComments.filter(c => c.template_section_id === section.id)
           const sectionReviewComments = reviewComments.filter(c => c.template_section_id === section.id)
+          const editedRow = textBySectionId[section.id]
+          const fieldsForSection = section.field_definitions || []
           return (
             <div key={section.id}>
               <div style={{ fontWeight: '700', color: '#374151', fontSize: '14px', marginTop: '18px', marginBottom: '6px' }}>{section.title}</div>
-              <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues, fieldsByKey)}</div>
-              {ownComments.map(c => (
-                <div key={c.id} style={s.orgNote}>Organization's note: "{c.comment_text}"</div>
-              ))}
+
+              {fieldsForSection.length > 0 && (
+                <div style={s.originalAnswersBox}>
+                  {fieldsForSection.map(field => (
+                    <div key={field.key}><span style={s.originalAnswerLabel}>{field.label}:</span> {fieldValues[field.key] || '—'}</div>
+                  ))}
+                </div>
+              )}
+
+              {role ? (
+                <>
+                  <textarea
+                    style={s.editableText}
+                    value={editedDraft[section.id] ?? ''}
+                    onChange={e => setEditedDraft(prev => ({ ...prev, [section.id]: e.target.value }))}
+                    onBlur={() => handleSectionTextBlur(section.id)}
+                  />
+                  <div style={s.editedMeta}>
+                    <span>{editedRow ? `Edited by ${editedRow.edited_by} · ${formatDateTime(editedRow.edited_at)}` : 'Not yet edited — showing generated text'}</span>
+                    {editedRow && <span style={s.revertLink} onClick={() => handleRevertSection(section.id)}>Revert to Submitter's Answer</span>}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{editedDraft[section.id]}</div>
+              )}
+
               {sectionReviewComments.map(c => (
                 <div key={c.id} style={s.commentCard}>
                   <div style={s.commentMeta}>
@@ -305,7 +350,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
                 <div style={{ marginTop: '6px', marginBottom: '16px' }}>
                   <textarea
                     style={{ ...s.textarea, minHeight: '50px' }}
-                    placeholder={`Add a comment on "${section.title}"...`}
+                    placeholder={`Add a note on "${section.title}"...`}
                     value={newCommentSectionId === section.id ? newComment : ''}
                     onFocus={() => setNewCommentSectionId(section.id)}
                     onChange={e => { setNewCommentSectionId(section.id); setNewComment(e.target.value) }}
@@ -316,7 +361,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
                         <input type="checkbox" checked={newCommentVisible} onChange={e => setNewCommentVisible(e.target.checked)} />
                         Visible to organization
                       </label>
-                      <button style={s.buttonSecondary} disabled={working} onClick={handlePostComment}>Post Comment</button>
+                      <button style={s.buttonSecondary} disabled={working} onClick={handlePostComment}>Post Note</button>
                     </>
                   )}
                 </div>
@@ -325,9 +370,9 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
           )
         })}
 
-        <div style={s.sectionTitle}>General Comments</div>
+        <div style={s.sectionTitle}>General Notes</div>
         {reviewComments.filter(c => !c.template_section_id).length === 0 ? (
-          <div style={{ fontSize: '13px', color: '#9ca3af' }}>No general comments.</div>
+          <div style={{ fontSize: '13px', color: '#9ca3af' }}>No general notes.</div>
         ) : (
           reviewComments.filter(c => !c.template_section_id).map(c => (
             <div key={c.id} style={s.commentCard}>
@@ -343,7 +388,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
           <div style={{ marginTop: '8px' }}>
             <textarea
               style={s.textarea}
-              placeholder="Add a general comment..."
+              placeholder="Add a general note..."
               value={newCommentSectionId === null ? newComment : ''}
               onFocus={() => setNewCommentSectionId(null)}
               onChange={e => { setNewCommentSectionId(null); setNewComment(e.target.value) }}
@@ -354,7 +399,7 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
                   <input type="checkbox" checked={newCommentVisible} onChange={e => setNewCommentVisible(e.target.checked)} />
                   Visible to organization
                 </label>
-                <button style={s.buttonSecondary} disabled={working} onClick={handlePostComment}>Post Comment</button>
+                <button style={s.buttonSecondary} disabled={working} onClick={handlePostComment}>Post Note</button>
               </>
             )}
           </div>
@@ -389,7 +434,8 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
             <div style={s.actionBoxTitle}>Brenda's Review Actions</div>
             <textarea style={s.textarea} placeholder="Reason / notes for sending back (included in the notification email)..." value={sendBackNotes} onChange={e => setSendBackNotes(e.target.value)} />
             <div>
-              <button style={s.buttonSecondary} disabled={working} onClick={handleSendBackToOrg}>Send Back to Organization</button>
+              <button style={s.buttonSecondary} disabled={working} onClick={() => handleSendBack('missing_information')}>Send Back — Missing Information</button>
+              <button style={s.buttonSecondary} disabled={working} onClick={() => handleSendBack('submitter_needs_review')}>Send Back — Submitter Needs to Review/Approve</button>
               <button style={s.button} disabled={working} onClick={handlePushToCityManager}>Push to City Manager</button>
             </div>
           </div>
@@ -400,17 +446,11 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
             <div style={s.actionBoxTitle}>City Manager's Review Actions</div>
             <textarea style={s.textarea} placeholder="Reason / notes for sending back (included in the notification email)..." value={sendBackNotes} onChange={e => setSendBackNotes(e.target.value)} />
             <div>
+              <button style={s.buttonSecondary} disabled={working} onClick={() => handleSendBack('missing_information')}>Send Back — Missing Information</button>
+              <button style={s.buttonSecondary} disabled={working} onClick={() => handleSendBack('submitter_needs_review')}>Send Back — Submitter Needs to Review/Approve</button>
               <button style={s.buttonSecondary} disabled={working} onClick={handleSendBackToBrenda}>Send Back to Brenda</button>
-              <button style={s.buttonSecondary} disabled={working} onClick={handleSendBackToOrg}>Send Back to Organization</button>
-              {canFinalize && <button style={s.button} disabled={working} onClick={handleFinalize}>Finalize Agreement</button>}
+              {canMarkReadyForCouncil && <button style={s.button} disabled={working} onClick={handleMarkReadyForCouncil}>Mark Ready for Council</button>}
             </div>
-          </div>
-        )}
-
-        {canExport && (
-          <div style={s.actionBox}>
-            <div style={s.actionBoxTitle}>Export</div>
-            <button style={s.button} disabled={working} onClick={handleGoToExport}>🖨️ Print / Export Agreement</button>
           </div>
         )}
 
@@ -425,18 +465,9 @@ function MouSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
         {canRecordDecision && (
           <div style={s.actionBox}>
             <div style={s.actionBoxTitle}>Record City Council Decision</div>
-            <select style={s.input} value={decisionType} onChange={e => setDecisionType(e.target.value)}>
-              <option value="approved">Approved</option>
-              <option value="disapproved">Disapproved</option>
-              <option value="sent_back_for_edits">Sent Back for Edits</option>
-            </select>
-            {decisionType === 'sent_back_for_edits' && (
-              <select style={s.input} value={reopenStage} onChange={e => setReopenStage(e.target.value)}>
-                <option value="brenda_review">Reopen to Brenda's Review</option>
-                <option value="city_manager_review">Reopen to City Manager's Review</option>
-              </select>
-            )}
-            <button style={s.button} disabled={working} onClick={handleRecordDecision}>Record Decision</button>
+            <button style={s.button} disabled={working} onClick={() => handleRecordDecision('approved')}>Approved</button>
+            <button style={s.buttonDanger} disabled={working} onClick={() => handleRecordDecision('denied')}>Denied</button>
+            <button style={s.buttonSecondary} disabled={working} onClick={handleSendBackToCityManagerReview}>Send Back to City Manager Review</button>
           </div>
         )}
       </div>

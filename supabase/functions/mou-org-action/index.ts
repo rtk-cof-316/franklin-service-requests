@@ -1,8 +1,14 @@
 // Single entry point for every PIN-gated org-side action on an existing MOU submission:
-// status lookup, field edits, "suggest a change" comments, and submit/resubmit. Runs with
-// the service role key (same reasoning as mou-submit) — the PIN itself is the org's only
-// credential, so verifying it is this function's first job on every call, before any
-// action-specific logic runs.
+// status lookup, field edits, and the whole-document decision. Runs with the service role
+// key (same reasoning as mou-submit) — the PIN itself is the org's only credential, so
+// verifying it is this function's first job on every call, before any action-specific
+// logic runs.
+//
+// EDITABLE_STAGES gates plain-question field edits (page 1). DECISION_ELIGIBLE_STAGES
+// gates save_decision (page 2's looks-good/accept-with-changes/do-not-like + comment) —
+// broader than EDITABLE_STAGES because submitter_needs_review is decision-eligible but not
+// field-editable (the org is re-reviewing the admin's edited document, not re-answering
+// questions).
 
 import { MOU_REVIEWERS } from '../_shared/mouConfig.ts'
 
@@ -13,7 +19,13 @@ const corsHeaders = {
 
 const LOCKOUT_THRESHOLD = 5
 const LOCKOUT_MINUTES = 30
-const EDITABLE_STAGES = ['org_drafting', 'org_revision']
+const EDITABLE_STAGES = ['org_intake', 'missing_information']
+const DECISION_ELIGIBLE_STAGES = ['org_intake', 'missing_information', 'submitter_needs_review']
+const DECISION_LABELS: Record<string, string> = {
+  looks_good: 'This looks good to me',
+  accept_with_changes: 'Accept with changes',
+  do_not_like: 'I do not like this',
+}
 
 async function hashPin(pin: string): Promise<string> {
   const data = new TextEncoder().encode(pin)
@@ -37,7 +49,6 @@ Deno.serve(async (req) => {
   }
 
   const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')!
-  const brevoKey = Deno.env.get('BREVO_API_KEY')!
   const supabaseUrl = 'https://sdibtkmmcegthmytmzvy.supabase.co'
   const authHeaders = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` }
 
@@ -95,10 +106,10 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'lookup') {
-    const [sectionsRes, valuesRes, commentsRes, reviewCommentsRes, docsRes, activityRes] = await Promise.all([
+    const [sectionsRes, valuesRes, sectionTextRes, reviewCommentsRes, docsRes, activityRes] = await Promise.all([
       fetch(`${supabaseUrl}/rest/v1/mou_template_sections?template_id=eq.${submission.template_id}&select=*&order=section_order`, { headers: authHeaders }),
       fetch(`${supabaseUrl}/rest/v1/mou_submission_field_values?submission_id=eq.${submission.id}&select=*`, { headers: authHeaders }),
-      fetch(`${supabaseUrl}/rest/v1/mou_submission_section_comments?submission_id=eq.${submission.id}&select=*`, { headers: authHeaders }),
+      fetch(`${supabaseUrl}/rest/v1/mou_submission_section_text?submission_id=eq.${submission.id}&select=*`, { headers: authHeaders }),
       fetch(`${supabaseUrl}/rest/v1/mou_review_comments?submission_id=eq.${submission.id}&org_visible=eq.true&select=*&order=created_at`, { headers: authHeaders }),
       fetch(`${supabaseUrl}/rest/v1/mou_supporting_documents?submission_id=eq.${submission.id}&select=*`, { headers: authHeaders }),
       fetch(`${supabaseUrl}/rest/v1/mou_activity_log?submission_id=eq.${submission.id}&select=*&order=created_at`, { headers: authHeaders }),
@@ -108,11 +119,12 @@ Deno.serve(async (req) => {
       submission: safeSubmission,
       sections: await sectionsRes.json(),
       fieldValues: await valuesRes.json(),
-      sectionComments: await commentsRes.json(),
+      editedSectionText: await sectionTextRes.json(),
       reviewComments: await reviewCommentsRes.json(),
       supportingDocuments: await docsRes.json(),
       activityLog: await activityRes.json(),
-      editable: EDITABLE_STAGES.includes(submission.current_stage),
+      fieldsEditable: EDITABLE_STAGES.includes(submission.current_stage),
+      decisionEligible: DECISION_ELIGIBLE_STAGES.includes(submission.current_stage),
     })
   }
 
@@ -138,26 +150,13 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: true })
   }
 
-  if (action === 'save_section_comment') {
-    if (!EDITABLE_STAGES.includes(submission.current_stage)) {
-      return jsonResponse({ error: 'This submission is not currently editable' }, 409)
+  if (action === 'save_decision') {
+    if (!DECISION_ELIGIBLE_STAGES.includes(submission.current_stage)) {
+      return jsonResponse({ error: 'This submission is not currently awaiting your decision' }, 409)
     }
-    const { templateSectionId, commentText } = body
-    if (!templateSectionId || !commentText) {
-      return jsonResponse({ error: 'templateSectionId and commentText are required' }, 400)
-    }
-    await fetch(`${supabaseUrl}/rest/v1/mou_submission_section_comments`, {
-      method: 'POST',
-      headers: { ...authHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ submission_id: submission.id, template_section_id: templateSectionId, comment_text: commentText }),
-    })
-    await logActivity({ action_type: 'section_comment_added', field_or_section: templateSectionId, notes: commentText })
-    return jsonResponse({ success: true })
-  }
-
-  if (action === 'submit') {
-    if (!EDITABLE_STAGES.includes(submission.current_stage)) {
-      return jsonResponse({ error: 'This submission is not currently editable' }, 409)
+    const { decision, comment } = body
+    if (!decision || !DECISION_LABELS[decision]) {
+      return jsonResponse({ error: 'A valid decision is required' }, 400)
     }
 
     const [sectionsRes, valuesRes] = await Promise.all([
@@ -187,24 +186,31 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Required fields are missing', missing }, 400)
     }
 
-    const isInitialSubmit = submission.current_stage === 'org_drafting'
-    const nextStage = isInitialSubmit ? 'submitted' : (submission.return_to_stage || 'brenda_review')
+    const isInitialDecision = submission.current_stage === 'org_intake'
+    const nextStage = submission.return_to_stage || 'manager_review_brenda'
 
     await fetch(`${supabaseUrl}/rest/v1/mou_submissions?id=eq.${submission.id}`, {
       method: 'PATCH',
       headers: { ...authHeaders, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ current_stage: nextStage, return_to_stage: null }),
+      body: JSON.stringify({
+        current_stage: nextStage,
+        return_to_stage: null,
+        org_review_decision: decision,
+        org_review_comment: comment || null,
+        org_review_decided_at: new Date().toISOString(),
+      }),
     })
     await logActivity({
-      action_type: isInitialSubmit ? 'submitted' : 'resubmitted',
+      action_type: 'org_decision_submitted',
       old_value: submission.current_stage,
       new_value: nextStage,
+      notes: DECISION_LABELS[decision] + (comment ? ` — ${comment}` : ''),
     })
 
-    if (isInitialSubmit) {
+    if (isInitialDecision) {
       await sendMouEmail('mou_submitted', { toEmail: MOU_REVIEWERS.brenda.email, toName: MOU_REVIEWERS.brenda.name })
     } else {
-      const target = nextStage === 'city_manager_review' ? MOU_REVIEWERS.cityManager : MOU_REVIEWERS.brenda
+      const target = nextStage === 'manager_review_city_manager' ? MOU_REVIEWERS.cityManager : MOU_REVIEWERS.brenda
       await sendMouEmail('mou_org_resubmitted', { toEmail: target.email, toName: target.name })
     }
 

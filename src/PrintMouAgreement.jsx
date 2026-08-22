@@ -1,17 +1,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { resolveSectionText } from './mouTextRender'
 
 function formatDateTime(dateStr) {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-
-function renderPrintText(text, valuesByKey, fieldsByKey) {
-  return text.replace(/\{\{([a-z_]+)\}\}/g, (_, key) => {
-    const fieldDef = fieldsByKey[key]
-    if (fieldDef?.conditional_on && valuesByKey[fieldDef.conditional_on] !== 'yes') return 'Not Applicable'
-    return valuesByKey[key] || '_____________'
-  })
 }
 
 const s = {
@@ -20,7 +13,7 @@ const s = {
   headerTitle: { margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700' },
   headerSub: { margin: 0, fontSize: '11px', color: '#6b7280' },
   sectionTitle: { fontSize: '13px', fontWeight: '700', marginTop: '20px', marginBottom: '8px' },
-  sectionText: { fontSize: '12px', lineHeight: 1.7, whiteSpace: 'pre-wrap', textAlign: 'justify' },
+  sectionText: { fontSize: '12px', lineHeight: 1.7, whiteSpace: 'pre-wrap', textAlign: 'left' },
   footer: { textAlign: 'center', fontSize: '10px', color: '#9ca3af', padding: '20px 0', borderTop: '1px solid #e5e7eb', marginTop: '30px' },
   noPrint: { textAlign: 'center', padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' },
 }
@@ -29,6 +22,7 @@ function PrintMouAgreement({ submissionId, onClose }) {
   const [submission, setSubmission] = useState(null)
   const [sections, setSections] = useState([])
   const [valuesByKey, setValuesByKey] = useState({})
+  const [editedTextBySectionId, setEditedTextBySectionId] = useState({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,14 +34,16 @@ function PrintMouAgreement({ submissionId, onClose }) {
     const { data: sub } = await supabase.from('mou_submissions').select('*').eq('id', submissionId).single()
     if (sub) {
       setSubmission(sub)
-      const [secRes, valRes] = await Promise.all([
+      const [secRes, valRes, textRes] = await Promise.all([
         supabase.from('mou_template_sections').select('*').eq('template_id', sub.template_id).order('section_order'),
         supabase.from('mou_submission_field_values').select('*').eq('submission_id', submissionId),
+        supabase.from('mou_submission_section_text').select('*').eq('submission_id', submissionId),
       ])
       setSections(secRes.data || [])
       const values = {}
       for (const fv of valRes.data || []) values[fv.field_key] = fv.value
       setValuesByKey(values)
+      setEditedTextBySectionId(Object.fromEntries((textRes.data || []).map(row => [row.template_section_id, row.edited_text])))
     }
     setLoading(false)
   }
@@ -92,7 +88,7 @@ function PrintMouAgreement({ submissionId, onClose }) {
         {sections.map(section => (
           <div key={section.id}>
             <div style={s.sectionTitle}>{section.title}</div>
-            <div style={s.sectionText}>{renderPrintText(section.locked_text, valuesByKey, fieldsByKey)}</div>
+            <div style={s.sectionText}>{resolveSectionText(section, valuesByKey, fieldsByKey, editedTextBySectionId[section.id])}</div>
           </div>
         ))}
 

@@ -16,27 +16,38 @@ export function mouReviewerRole(email) {
 }
 
 export const MOU_STAGE_LABELS = {
-  org_drafting: 'Drafting',
-  submitted: 'Submitted',
-  brenda_review: 'City Review',
-  city_manager_review: 'City Manager Review',
-  org_revision: 'Awaiting Organization',
-  finalized: 'Finalized',
-  exported: 'Exported',
-  scheduled_council: 'Scheduled for Council',
-  council_decided: 'Council Decision Recorded',
+  org_intake: 'Intake',
+  missing_information: 'Missing Information',
+  manager_review_brenda: 'Manager Review — Brenda',
+  manager_review_city_manager: 'Manager Review — City Manager',
+  submitter_needs_review: 'Awaiting Submitter Review',
+  ready_for_council: 'Ready for Council',
+  approved: 'Approved',
+  denied: 'Denied',
 }
 
-// The forward-progress order used to render the status progress bar. org_revision is a
-// loop-back state, not a forward step, so it's rendered as an overlay/badge on whichever
-// stage it returns to rather than its own step — see MouStatus.jsx.
+// Org-facing version of the labels above — the org doesn't need to know which of the two
+// internal reviewers currently has it, so both manager_review_* stages collapse to one
+// label here. Admins keep seeing the distinction via MOU_STAGE_LABELS.
+export function orgFacingStageLabel(stage) {
+  if (stage === 'manager_review_brenda' || stage === 'manager_review_city_manager') return 'Manager Review'
+  return MOU_STAGE_LABELS[stage] || stage
+}
+
+// The forward-progress order used to render the org's status progress bar. Both internal
+// review stages collapse onto the same bar position (see orgFacingStageLabel above);
+// missing_information/submitter_needs_review are loop-back states rendered as a banner
+// rather than their own step, and denied is a banner too, not a step — see MouStatus.jsx.
 export const MOU_PROGRESS_STEPS = [
-  'submitted',
-  'brenda_review',
-  'city_manager_review',
-  'finalized',
-  'scheduled_council',
-  'council_decided',
+  'manager_review_brenda',
+  'ready_for_council',
+  'approved',
 ]
+
+export const MOU_ORG_REVIEW_DECISION_LABELS = {
+  looks_good: 'This looks good to me',
+  accept_with_changes: 'Accept with changes',
+  do_not_like: 'I do not like this',
+}
 
 export const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'

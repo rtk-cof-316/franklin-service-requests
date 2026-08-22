@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       sequence_number: nextSequence,
       year: currentYear,
       pin_hash: pinHash,
-      current_stage: 'org_drafting',
+      current_stage: 'org_intake',
     }),
   })
   const inserted = await insertRes.json()

@@ -23,15 +23,14 @@ const styles = {
 }
 
 const STAGE_COLORS = {
-  submitted: { bg: '#dbeafe', color: '#1e40af' },
-  brenda_review: { bg: '#dbeafe', color: '#1e40af' },
-  city_manager_review: { bg: '#e0e7ff', color: '#3730a3' },
-  org_revision: { bg: '#fef3c7', color: '#92400e' },
-  finalized: { bg: '#d1fae5', color: '#065f46' },
-  exported: { bg: '#d1fae5', color: '#065f46' },
-  scheduled_council: { bg: '#fce7f3', color: '#9d174d' },
-  council_decided: { bg: '#d1fae5', color: '#065f46' },
-  org_drafting: { bg: '#f3f4f6', color: '#6b7280' },
+  org_intake: { bg: '#f3f4f6', color: '#6b7280' },
+  missing_information: { bg: '#fef3c7', color: '#92400e' },
+  manager_review_brenda: { bg: '#dbeafe', color: '#1e40af' },
+  manager_review_city_manager: { bg: '#e0e7ff', color: '#3730a3' },
+  submitter_needs_review: { bg: '#fef3c7', color: '#92400e' },
+  ready_for_council: { bg: '#fce7f3', color: '#9d174d' },
+  approved: { bg: '#d1fae5', color: '#065f46' },
+  denied: { bg: '#fee2e2', color: '#991b1b' },
 }
 
 function formatDate(dateStr) {
@@ -59,9 +58,10 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
     setLoading(false)
   }
 
+  const DECIDED_STAGES = ['approved', 'denied']
   const filtered = submissions.filter(sub => {
-    if (filter === 'active' && sub.current_stage === 'council_decided') return false
-    if (filter === 'decided' && sub.current_stage !== 'council_decided') return false
+    if (filter === 'active' && DECIDED_STAGES.includes(sub.current_stage)) return false
+    if (filter === 'decided' && !DECIDED_STAGES.includes(sub.current_stage)) return false
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       const haystack = `${sub.org_name} ${sub.org_contact_name} ${sub.org_email} ${sub.submission_number}`.toLowerCase()
@@ -109,7 +109,7 @@ function AdminMouSubmissions({ onViewSubmission, onEditTemplate }) {
           </thead>
           <tbody>
             {filtered.map(sub => {
-              const color = STAGE_COLORS[sub.current_stage] || STAGE_COLORS.org_drafting
+              const color = STAGE_COLORS[sub.current_stage] || STAGE_COLORS.org_intake
               return (
                 <tr key={sub.id} style={styles.row} onClick={() => onViewSubmission(sub.id)}>
                   <td style={{ ...styles.td, fontWeight: '700', color: '#1a56a0' }}>{sub.submission_number}</td>

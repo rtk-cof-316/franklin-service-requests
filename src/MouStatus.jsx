@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
-import { SUPABASE_URL, MOU_STAGE_LABELS, MOU_PROGRESS_STEPS } from './mouConfig'
-import { buildFieldsByKey, parseMouLockedText } from './mouTextRender'
+import { SUPABASE_URL, MOU_STAGE_LABELS, MOU_PROGRESS_STEPS, orgFacingStageLabel } from './mouConfig'
+import { buildFieldsByKey, resolveSectionText } from './mouTextRender'
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const MAX_FILES = 6
 const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+const DECISIONS = [
+  { key: 'looks_good', label: 'This looks good to me' },
+  { key: 'accept_with_changes', label: 'Accept with changes' },
+  { key: 'do_not_like', label: 'I do not like this' },
+]
 
 const s = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
@@ -17,14 +23,13 @@ const s = {
   textarea: { width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', marginBottom: '4px', boxSizing: 'border-box', minHeight: '90px', fontFamily: 'inherit', resize: 'vertical' },
   button: { padding: '12px 28px', backgroundColor: '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   buttonDisabled: { padding: '12px 28px', backgroundColor: '#9ca3af', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'not-allowed' },
+  buttonSecondary: { padding: '10px 20px', backgroundColor: '#ffffff', color: '#374151', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   errorBox: { backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '14px 16px', marginBottom: '16px', fontSize: '13px', color: '#991b1b' },
   sectionTitle: { fontSize: '16px', fontWeight: '700', color: '#1a56a0', marginTop: '28px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '2px solid #e5e7eb' },
-  lockedText: { fontSize: '13px', color: '#374151', lineHeight: 1.7, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '14px 16px', marginBottom: '14px', whiteSpace: 'pre-wrap' },
-  token: { color: '#1a56a0', fontWeight: '600', backgroundColor: '#eff6ff', padding: '0 3px', borderRadius: '3px' },
   fieldRow: { marginBottom: '14px' },
   guidance: { fontSize: '12px', color: '#9ca3af', marginTop: '-12px', marginBottom: '10px' },
   toggleRow: { display: 'flex', gap: '10px', marginBottom: '10px' },
-  toggleBtn: (active, disabled) => ({ padding: '8px 18px', borderRadius: '6px', border: active ? '2px solid #1a56a0' : '1px solid #d1d5db', backgroundColor: active ? '#eff6ff' : '#ffffff', color: active ? '#1a56a0' : '#374151', fontWeight: '600', fontSize: '13px', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.7 : 1 }),
+  toggleBtn: (active) => ({ padding: '8px 18px', borderRadius: '6px', border: active ? '2px solid #1a56a0' : '1px solid #d1d5db', backgroundColor: active ? '#eff6ff' : '#ffffff', color: active ? '#1a56a0' : '#374151', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }),
   progressWrap: { display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' },
   step: (state) => ({
     flex: 1, minWidth: '90px', textAlign: 'center', padding: '10px 6px', borderRadius: '6px', fontSize: '11px', fontWeight: '600',
@@ -36,14 +41,10 @@ const s = {
   commentMeta: { fontSize: '11px', color: '#6b7280', marginBottom: '4px' },
   activityRow: { display: 'flex', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' },
   activityDot: { width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#1a56a0', marginTop: '5px', flexShrink: 0 },
-}
-
-function renderLockedText(text, valuesByKey, fieldsByKey) {
-  return parseMouLockedText(text, valuesByKey, fieldsByKey).map((seg, i) =>
-    seg.type === 'text'
-      ? <span key={i}>{seg.text}</span>
-      : <span key={i} style={s.token}>{seg.displayValue || `[${seg.key.replace(/_/g, ' ')}]`}</span>
-  )
+  reviewSection: { marginBottom: '18px' },
+  reviewSectionTitle: { fontWeight: '700', color: '#374151', fontSize: '14px', marginBottom: '6px' },
+  reviewText: { fontSize: '13px', color: '#111827', lineHeight: 1.7, whiteSpace: 'pre-wrap' },
+  decisionBox: { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '20px 24px', marginTop: '24px' },
 }
 
 function formatDateTime(dateStr) {
@@ -60,10 +61,17 @@ function MouStatus() {
   const [data, setData] = useState(null)
   const [fieldValues, setFieldValues] = useState({})
   const [uploading, setUploading] = useState(false)
+  const [reviewMode, setReviewMode] = useState(false)
+
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [missingFields, setMissingFields] = useState([])
   const [justResubmitted, setJustResubmitted] = useState(false)
+
+  const [decision, setDecision] = useState(null)
+  const [comment, setComment] = useState('')
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false)
+  const [decisionError, setDecisionError] = useState(null)
 
   async function callOrgAction(action, extra) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/mou-org-action`, {
@@ -72,6 +80,34 @@ function MouStatus() {
       body: JSON.stringify({ submissionNumber: submissionNumberInput.trim(), pin: pinInput.trim(), action, ...extra }),
     })
     return res.json()
+  }
+
+  function requiredFieldsMissing(result) {
+    const missing = []
+    const valuesByKey = {}
+    for (const fv of result.fieldValues) valuesByKey[fv.field_key] = fv.value
+    for (const section of result.sections) {
+      for (const field of section.field_definitions || []) {
+        if (field.conditional_on) {
+          if (valuesByKey[field.conditional_on] === 'yes' && !valuesByKey[field.key]) missing.push(field.key)
+          continue
+        }
+        if (field.required && !valuesByKey[field.key]) missing.push(field.key)
+      }
+    }
+    return missing
+  }
+
+  function applyResult(result) {
+    setData(result)
+    const values = {}
+    for (const fv of result.fieldValues) values[fv.field_key] = fv.value
+    setFieldValues(values)
+    // Land on page 2 (review) whenever the org can act but has nothing left to fill in —
+    // otherwise page 1 (intake). Worst case of guessing wrong here is just the wrong page;
+    // save_decision re-validates required fields server-side regardless.
+    const nothingLeftToFill = requiredFieldsMissing(result).length === 0
+    setReviewMode(result.decisionEligible && (!result.fieldsEditable || nothingLeftToFill))
   }
 
   async function handleLookup(e) {
@@ -84,10 +120,7 @@ function MouStatus() {
       setLookupError(result.error)
       return
     }
-    setData(result)
-    const values = {}
-    for (const fv of result.fieldValues) values[fv.field_key] = fv.value
-    setFieldValues(values)
+    applyResult(result)
   }
 
   function handleFieldChange(key, value) {
@@ -118,23 +151,34 @@ function MouStatus() {
     }
     setUploading(false)
     const refreshed = await callOrgAction('lookup', {})
-    if (!refreshed.error) setData(refreshed)
+    if (!refreshed.error) applyResult(refreshed)
   }
 
-  async function handleResubmit() {
-    setSubmitting(true)
+  function handleContinueToReview() {
+    const missing = requiredFieldsMissing(data)
+    if (missing.length > 0) {
+      setSubmitError('Please answer all required questions before continuing.')
+      setMissingFields(missing)
+      return
+    }
     setSubmitError(null)
     setMissingFields([])
-    const result = await callOrgAction('submit', {})
-    setSubmitting(false)
+    setReviewMode(true)
+  }
+
+  async function handleSubmitDecision() {
+    if (!decision) return
+    setDecisionSubmitting(true)
+    setDecisionError(null)
+    const result = await callOrgAction('save_decision', { decision, comment: comment.trim() || null })
+    setDecisionSubmitting(false)
     if (result.error) {
-      setSubmitError(result.error)
-      setMissingFields(result.missing || [])
+      setDecisionError(result.error)
       return
     }
     setJustResubmitted(true)
     const refreshed = await callOrgAction('lookup', {})
-    if (!refreshed.error) setData(refreshed)
+    if (!refreshed.error) applyResult(refreshed)
   }
 
   if (!data) {
@@ -161,9 +205,58 @@ function MouStatus() {
     )
   }
 
-  const { submission, sections, sectionComments, reviewComments, supportingDocuments, activityLog, editable } = data
+  const { submission, sections, editedSectionText, reviewComments, supportingDocuments, activityLog, fieldsEditable, decisionEligible } = data
   const fieldsByKey = buildFieldsByKey(sections)
-  const currentIndex = MOU_PROGRESS_STEPS.indexOf(submission.current_stage === 'org_revision' ? (submission.return_to_stage || 'brenda_review') : submission.current_stage)
+  const editedTextBySectionId = Object.fromEntries((editedSectionText || []).map(row => [row.template_section_id, row.edited_text]))
+  const orgStageIndex = MOU_PROGRESS_STEPS.indexOf(
+    submission.current_stage === 'manager_review_city_manager' ? 'manager_review_brenda' : submission.current_stage
+  )
+
+  if (reviewMode) {
+    return (
+      <div style={s.page}>
+        <div style={s.card}>
+          <h1 style={s.title}>{submission.org_name}</h1>
+          <p style={s.subtitle}>Submission {submission.submission_number} — here's the agreement as it currently stands.</p>
+
+          {sections.map(section => (
+            <div key={section.id} style={s.reviewSection}>
+              <div style={s.reviewSectionTitle}>{section.title}</div>
+              <div style={s.reviewText}>{resolveSectionText(section, fieldValues, fieldsByKey, editedTextBySectionId[section.id])}</div>
+            </div>
+          ))}
+
+          {decisionEligible ? (
+            <div style={s.decisionBox}>
+              <label style={s.label}>How does this look?</label>
+              <div style={{ ...s.toggleRow, flexWrap: 'wrap' }}>
+                {DECISIONS.map(d => (
+                  <button key={d.key} type="button" style={s.toggleBtn(decision === d.key)} onClick={() => setDecision(d.key)}>{d.label}</button>
+                ))}
+              </div>
+              <label style={{ ...s.label, marginTop: '14px' }}>Comments (optional)</label>
+              <textarea style={s.textarea} value={comment} onChange={e => setComment(e.target.value)} placeholder="Anything you'd like the City to know..." />
+              {decisionError && <div style={{ ...s.errorBox, marginTop: '10px' }}>{decisionError}</div>}
+              <div style={{ marginTop: '14px' }}>
+                {fieldsEditable && <button type="button" style={s.buttonSecondary} onClick={() => setReviewMode(false)}>← Back to edit my answers</button>}
+                {' '}
+                <button
+                  type="button"
+                  disabled={!decision || decisionSubmitting}
+                  style={!decision || decisionSubmitting ? s.buttonDisabled : s.button}
+                  onClick={handleSubmitDecision}
+                >
+                  {decisionSubmitting ? 'Submitting…' : 'Submit to the City'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p style={{ fontSize: '13px', color: '#6b7280' }}>This submission isn't currently awaiting your review.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={s.page}>
@@ -173,27 +266,38 @@ function MouStatus() {
 
         <div style={s.progressWrap}>
           {MOU_PROGRESS_STEPS.map((stepKey, i) => {
-            const state = i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'upcoming'
-            return <div key={stepKey} style={s.step(state)}>{MOU_STAGE_LABELS[stepKey]}</div>
+            const state = i < orgStageIndex ? 'done' : i === orgStageIndex ? 'current' : 'upcoming'
+            return <div key={stepKey} style={s.step(state)}>{orgFacingStageLabel(stepKey)}</div>
           })}
         </div>
 
-        {submission.current_stage === 'org_revision' && (
+        {submission.current_stage === 'missing_information' && (
           <div style={s.loopBanner}>
-            <strong>Action needed:</strong> the City has sent this submission back for changes or clarification. Update the fields below and resubmit when ready.
+            <strong>Action needed:</strong> the City needs more information. Update the answers below and continue when ready.
+          </div>
+        )}
+
+        {submission.current_stage === 'submitter_needs_review' && (
+          <div style={s.loopBanner}>
+            <strong>Action needed:</strong> the City has made edits to your agreement. Please review it and let us know how it looks.
           </div>
         )}
 
         {justResubmitted && (
           <div style={{ ...s.loopBanner, backgroundColor: '#d1fae5', borderColor: '#6ee7b7', color: '#065f46' }}>
-            Resubmitted — the City has been notified.
+            Submitted — the City has been notified.
           </div>
         )}
 
-        {submission.council_decision && (
+        {submission.current_stage === 'approved' && (
+          <div style={{ ...s.loopBanner, backgroundColor: '#d1fae5', borderColor: '#6ee7b7', color: '#065f46' }}>
+            <strong>City Council decision:</strong> Approved
+          </div>
+        )}
+
+        {submission.current_stage === 'denied' && (
           <div style={s.loopBanner}>
-            <strong>City Council decision:</strong> {submission.council_decision === 'approved' ? 'Approved' : submission.council_decision === 'disapproved' ? 'Disapproved' : 'Sent back for edits'}
-            {submission.council_decision_date ? ` on ${formatDateTime(submission.council_decision_date)}` : ''}
+            <strong>City Council decision:</strong> Denied
           </div>
         )}
 
@@ -210,41 +314,37 @@ function MouStatus() {
         )}
 
         <div style={s.sectionTitle}>Submission Contents</div>
-        {sections.map(section => {
-          const ownComments = sectionComments.filter(c => c.template_section_id === section.id)
-          return (
-            <div key={section.id}>
-              <div style={{ fontWeight: '700', color: '#374151', fontSize: '14px', marginTop: '18px', marginBottom: '6px' }}>{section.title}</div>
-              <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues, fieldsByKey)}</div>
-              {editable && (section.field_definitions || []).map(field => {
-                if (field.conditional_on && fieldValues[field.conditional_on] !== 'yes') return null
-                return (
-                  <div key={field.key} style={s.fieldRow}>
-                    <label style={s.label}>{field.label}</label>
-                    {field.type === 'yes_na_toggle' ? (
-                      <div style={s.toggleRow}>
-                        <button type="button" style={s.toggleBtn(fieldValues[field.key] === 'yes')}
-                          onClick={() => { handleFieldChange(field.key, 'yes'); callOrgAction('save_field', { templateSectionId: section.id, fieldKey: field.key, value: 'yes' }) }}>Yes</button>
-                        <button type="button" style={s.toggleBtn(fieldValues[field.key] === 'no')}
-                          onClick={() => { handleFieldChange(field.key, 'no'); callOrgAction('save_field', { templateSectionId: section.id, fieldKey: field.key, value: 'no' }) }}>Not Applicable</button>
-                      </div>
-                    ) : field.type === 'long_text' || field.type === 'list' ? (
-                      <textarea style={s.textarea} value={fieldValues[field.key] || ''} onChange={e => handleFieldChange(field.key, e.target.value)} onBlur={() => handleFieldBlur(section.id, field.key)} />
-                    ) : field.type === 'date' ? (
-                      <input type="date" style={s.input} value={fieldValues[field.key] || ''} onChange={e => handleFieldChange(field.key, e.target.value)} onBlur={() => handleFieldBlur(section.id, field.key)} />
-                    ) : (
-                      <input type="text" style={s.input} value={fieldValues[field.key] || ''} onChange={e => handleFieldChange(field.key, e.target.value)} onBlur={() => handleFieldBlur(section.id, field.key)} />
-                    )}
-                    {field.guidance && <div style={s.guidance}>{field.guidance}</div>}
-                  </div>
-                )
-              })}
-              {ownComments.map(c => (
-                <div key={c.id} style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic', marginBottom: '10px' }}>Your note: "{c.comment_text}"</div>
-              ))}
-            </div>
-          )
-        })}
+        {sections.map(section => (
+          <div key={section.id}>
+            <div style={{ fontWeight: '700', color: '#374151', fontSize: '14px', marginTop: '18px', marginBottom: '6px' }}>{section.title}</div>
+            {fieldsEditable && (section.field_definitions || []).map(field => {
+              if (field.conditional_on && fieldValues[field.conditional_on] !== 'yes') return null
+              return (
+                <div key={field.key} style={s.fieldRow}>
+                  <label style={s.label}>{field.label}</label>
+                  {field.type === 'yes_na_toggle' ? (
+                    <div style={s.toggleRow}>
+                      <button type="button" style={s.toggleBtn(fieldValues[field.key] === 'yes')}
+                        onClick={() => { handleFieldChange(field.key, 'yes'); callOrgAction('save_field', { templateSectionId: section.id, fieldKey: field.key, value: 'yes' }) }}>Yes</button>
+                      <button type="button" style={s.toggleBtn(fieldValues[field.key] === 'no')}
+                        onClick={() => { handleFieldChange(field.key, 'no'); callOrgAction('save_field', { templateSectionId: section.id, fieldKey: field.key, value: 'no' }) }}>Not Applicable</button>
+                    </div>
+                  ) : field.type === 'long_text' || field.type === 'list' ? (
+                    <textarea style={s.textarea} value={fieldValues[field.key] || ''} onChange={e => handleFieldChange(field.key, e.target.value)} onBlur={() => handleFieldBlur(section.id, field.key)} />
+                  ) : field.type === 'date' ? (
+                    <input type="date" style={s.input} value={fieldValues[field.key] || ''} onChange={e => handleFieldChange(field.key, e.target.value)} onBlur={() => handleFieldBlur(section.id, field.key)} />
+                  ) : (
+                    <input type="text" style={s.input} value={fieldValues[field.key] || ''} onChange={e => handleFieldChange(field.key, e.target.value)} onBlur={() => handleFieldBlur(section.id, field.key)} />
+                  )}
+                  {field.guidance && <div style={s.guidance}>{field.guidance}</div>}
+                </div>
+              )
+            })}
+            {!fieldsEditable && (
+              <div style={s.reviewText}>{resolveSectionText(section, fieldValues, fieldsByKey, editedTextBySectionId[section.id])}</div>
+            )}
+          </div>
+        ))}
 
         <div style={s.sectionTitle}>Supporting Documents</div>
         {supportingDocuments.length === 0 ? (
@@ -254,7 +354,7 @@ function MouStatus() {
             {supportingDocuments.map(f => <li key={f.id}>{f.file_name}</li>)}
           </ul>
         )}
-        {editable && (
+        {fieldsEditable && (
           <input type="file" multiple disabled={uploading} onChange={e => handleUpload(Array.from(e.target.files))} style={{ marginTop: '8px' }} />
         )}
 
@@ -269,7 +369,7 @@ function MouStatus() {
           </div>
         ))}
 
-        {editable && (
+        {fieldsEditable && (
           <>
             {submitError && (
               <div style={{ ...s.errorBox, marginTop: '20px' }}>
@@ -280,8 +380,8 @@ function MouStatus() {
               </div>
             )}
             <div style={{ marginTop: '20px' }}>
-              <button onClick={handleResubmit} disabled={submitting} style={submitting ? s.buttonDisabled : s.button}>
-                {submitting ? 'Resubmitting…' : 'Resubmit for Review'}
+              <button onClick={handleContinueToReview} style={s.button}>
+                Continue to Review →
               </button>
             </div>
           </>

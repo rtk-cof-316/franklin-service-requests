@@ -414,7 +414,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
-  if (body.type === 'mou_sent_back_to_org') {
+  if (body.type === 'mou_sent_back_missing_information') {
     const { submissionNumber, orgEmail, orgName, notes } = body
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -424,11 +424,32 @@ Deno.serve(async (req) => {
         to: [{ email: orgEmail, name: orgName }],
         subject: `Action Needed on Your MOU Submission — ${submissionNumber}`,
         htmlContent: mouEmailShell(
-          'Action Needed',
-          `The City has requested changes or clarification on your MOU submission (${submissionNumber}).`,
+          'Action Needed — Information Missing',
+          `The City needs more information before it can continue reviewing your MOU submission (${submissionNumber}).`,
           `${notes ? `<p style="font-size: 14px; color: #374151;"><strong>Note from the City:</strong> ${notes}</p>` : ''}
-           <p style="font-size: 14px; color: #374151;">Use your submission number and PIN to review the request, make updates, and resubmit.</p>`,
+           <p style="font-size: 14px; color: #374151;">Use your submission number and PIN to answer the questions again, then submit for review.</p>`,
           'Check Status & Update', MOU_STATUS_URL
+        ),
+      }),
+    })
+    return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
+  if (body.type === 'mou_sent_back_submitter_review') {
+    const { submissionNumber, orgEmail, orgName, notes } = body
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+      body: JSON.stringify({
+        sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
+        to: [{ email: orgEmail, name: orgName }],
+        subject: `Please Review Your MOU Agreement — ${submissionNumber}`,
+        htmlContent: mouEmailShell(
+          'Please Review',
+          `The City has made edits to your MOU agreement (${submissionNumber}) and needs you to review the current version.`,
+          `${notes ? `<p style="font-size: 14px; color: #374151;"><strong>Note from the City:</strong> ${notes}</p>` : ''}
+           <p style="font-size: 14px; color: #374151;">Use your submission number and PIN to review the agreement as it now stands, then let us know if it looks good, if you'd like to accept it with changes, or if you don't agree with it.</p>`,
+          'Check Status & Review', MOU_STATUS_URL
         ),
       }),
     })
@@ -475,7 +496,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, data: await res.json() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
-  if (body.type === 'mou_finalized') {
+  if (body.type === 'mou_ready_for_council') {
     const { submissionNumber, orgName } = body
     const results = []
     for (const to of [{ email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' }, { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' }]) {
@@ -485,10 +506,10 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           sender: { name: 'City of Franklin NH', email: 'noreply.franklin.sr@gmail.com' },
           to: [to],
-          subject: `MOU Finalized — ${submissionNumber}`,
+          subject: `MOU Ready for Council — ${submissionNumber}`,
           htmlContent: mouEmailShell(
-            'MOU Finalized',
-            `The MOU with ${orgName} (${submissionNumber}) has been finalized. The agreement text is now locked for export and ready to schedule for City Council.`,
+            'Ready for Council',
+            `The MOU with ${orgName} (${submissionNumber}) has cleared internal review and is ready to schedule for City Council.`,
             '',
             'View in Admin Dashboard', MOU_APP_URL
           ),
@@ -500,13 +521,13 @@ Deno.serve(async (req) => {
   }
 
   if (body.type === 'mou_council_decision') {
-    const { submissionNumber, orgName, orgEmail, decision, notifyOrg } = body
-    const decisionLabel = decision === 'approved' ? 'Approved' : decision === 'disapproved' ? 'Disapproved' : 'Sent Back for Edits'
+    const { submissionNumber, orgName, orgEmail, decision } = body
+    const decisionLabel = decision === 'approved' ? 'Approved' : 'Denied'
     const recipients = [
       { email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' },
       { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' },
     ]
-    if (notifyOrg && orgEmail) recipients.push({ email: orgEmail, name: orgName })
+    if (orgEmail) recipients.push({ email: orgEmail, name: orgName })
     const results = []
     for (const to of recipients) {
       const isOrg = to.email === orgEmail
@@ -520,9 +541,7 @@ Deno.serve(async (req) => {
           htmlContent: mouEmailShell(
             'City Council Decision',
             `City Council has recorded a decision on the MOU with ${orgName}: ${decisionLabel}.`,
-            decision === 'sent_back_for_edits'
-              ? `<p style="font-size: 14px; color: #374151;">${isOrg ? 'This submission has been reopened for another round of edits. Use your submission number and PIN to review what changed and update accordingly.' : 'The submission has been reopened for another round of review.'}</p>`
-              : '',
+            '',
             isOrg ? 'Check Status' : 'View in Admin Dashboard', isOrg ? MOU_STATUS_URL : MOU_APP_URL
           ),
         }),

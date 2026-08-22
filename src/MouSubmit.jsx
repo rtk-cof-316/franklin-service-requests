@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { SUPABASE_URL } from './mouConfig'
-import { buildFieldsByKey, parseMouLockedText } from './mouTextRender'
+import { buildFieldsByKey, resolveSectionText } from './mouTextRender'
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const MAX_FILES = 6
 const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+const DECISIONS = [
+  { key: 'looks_good', label: 'This looks good to me' },
+  { key: 'accept_with_changes', label: 'Accept with changes' },
+  { key: 'do_not_like', label: 'I do not like this' },
+]
 
 const s = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
@@ -17,27 +23,20 @@ const s = {
   textarea: { width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', marginBottom: '4px', boxSizing: 'border-box', minHeight: '90px', fontFamily: 'inherit', resize: 'vertical' },
   button: { padding: '12px 28px', backgroundColor: '#1a56a0', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   buttonDisabled: { padding: '12px 28px', backgroundColor: '#9ca3af', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'not-allowed' },
+  buttonSecondary: { padding: '10px 20px', backgroundColor: '#ffffff', color: '#374151', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   pinBox: { backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', padding: '24px', textAlign: 'center', marginBottom: '24px' },
   pinValue: { fontSize: '32px', fontWeight: '700', color: '#92400e', letterSpacing: '4px', margin: '8px 0' },
   sectionTitle: { fontSize: '16px', fontWeight: '700', color: '#1a56a0', marginTop: '28px', marginBottom: '8px', paddingBottom: '6px', borderBottom: '2px solid #e5e7eb' },
-  lockedText: { fontSize: '13px', color: '#374151', lineHeight: 1.7, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '14px 16px', marginBottom: '14px', whiteSpace: 'pre-wrap' },
-  token: { color: '#1a56a0', fontWeight: '600', backgroundColor: '#eff6ff', padding: '0 3px', borderRadius: '3px' },
   fieldRow: { marginBottom: '14px' },
   guidance: { fontSize: '12px', color: '#9ca3af', marginTop: '-12px', marginBottom: '10px' },
-  commentBox: { fontSize: '12px', color: '#6b7280', marginTop: '8px' },
   toggleRow: { display: 'flex', gap: '10px', marginBottom: '10px' },
   toggleBtn: (active) => ({ padding: '8px 18px', borderRadius: '6px', border: active ? '2px solid #1a56a0' : '1px solid #d1d5db', backgroundColor: active ? '#eff6ff' : '#ffffff', color: active ? '#1a56a0' : '#374151', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }),
   errorBox: { backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '14px 16px', marginBottom: '16px', fontSize: '13px', color: '#991b1b' },
   successBox: { backgroundColor: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: '8px', padding: '24px', textAlign: 'center' },
-  saveHint: { fontSize: '11px', color: '#9ca3af', marginTop: '-10px', marginBottom: '14px' },
-}
-
-function renderLockedText(text, valuesByKey, fieldsByKey) {
-  return parseMouLockedText(text, valuesByKey, fieldsByKey).map((seg, i) =>
-    seg.type === 'text'
-      ? <span key={i}>{seg.text}</span>
-      : <span key={i} style={s.token}>{seg.displayValue || `[${seg.key.replace(/_/g, ' ')}]`}</span>
-  )
+  reviewSection: { marginBottom: '18px' },
+  reviewSectionTitle: { fontWeight: '700', color: '#374151', fontSize: '14px', marginBottom: '6px' },
+  reviewText: { fontSize: '13px', color: '#111827', lineHeight: 1.7, whiteSpace: 'pre-wrap' },
+  decisionBox: { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '20px 24px', marginTop: '24px' },
 }
 
 function MouSubmit() {
@@ -53,13 +52,16 @@ function MouSubmit() {
   const [templateId, setTemplateId] = useState(null)
   const [sections, setSections] = useState([])
   const [fieldValues, setFieldValues] = useState({})
-  const [sectionComments, setSectionComments] = useState({})
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
 
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState(null)
+  const [continueError, setContinueError] = useState(null)
   const [missingFields, setMissingFields] = useState([])
+
+  const [decision, setDecision] = useState(null)
+  const [comment, setComment] = useState('')
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false)
+  const [decisionError, setDecisionError] = useState(null)
 
   useEffect(() => {
     if (templateId) loadSections()
@@ -114,16 +116,6 @@ function MouSubmit() {
     await callOrgAction('save_field', { templateSectionId: sectionId, fieldKey: key, value: fieldValues[key] ?? '' })
   }
 
-  function handleCommentChange(sectionId, value) {
-    setSectionComments(prev => ({ ...prev, [sectionId]: value }))
-  }
-
-  async function handleCommentBlur(sectionId) {
-    const text = (sectionComments[sectionId] || '').trim()
-    if (!text) return
-    await callOrgAction('save_section_comment', { templateSectionId: sectionId, commentText: text })
-  }
-
   async function handleUpload(selectedFiles) {
     if (!selectedFiles || selectedFiles.length === 0) return
     setUploading(true)
@@ -148,15 +140,40 @@ function MouSubmit() {
     setUploading(false)
   }
 
-  async function handleSubmit() {
-    setSubmitting(true)
-    setSubmitError(null)
+  function requiredFieldsMissing() {
+    const missing = []
+    for (const section of sections) {
+      for (const field of section.field_definitions || []) {
+        if (field.conditional_on) {
+          if (fieldValues[field.conditional_on] === 'yes' && !fieldValues[field.key]) missing.push(`${section.title}: ${field.label}`)
+          continue
+        }
+        if (field.required && !fieldValues[field.key]) missing.push(`${section.title}: ${field.label}`)
+      }
+    }
+    return missing
+  }
+
+  function handleContinueToReview() {
+    const missing = requiredFieldsMissing()
+    if (missing.length > 0) {
+      setContinueError('Please answer all required questions before continuing.')
+      setMissingFields(missing)
+      return
+    }
+    setContinueError(null)
     setMissingFields([])
-    const result = await callOrgAction('submit', {})
-    setSubmitting(false)
+    setPhase('review')
+  }
+
+  async function handleSubmitDecision() {
+    if (!decision) return
+    setDecisionSubmitting(true)
+    setDecisionError(null)
+    const result = await callOrgAction('save_decision', { decision, comment: comment.trim() || null })
+    setDecisionSubmitting(false)
     if (result.error) {
-      setSubmitError(result.error)
-      setMissingFields(result.missing || [])
+      setDecisionError(result.error)
       return
     }
     setPhase('submitted')
@@ -207,8 +224,51 @@ function MouSubmit() {
     )
   }
 
-  // phase === 'filling'
   const fieldsByKey = buildFieldsByKey(sections)
+
+  if (phase === 'review') {
+    return (
+      <div style={s.page}>
+        <div style={s.card}>
+          <h1 style={s.title}>{orgName}</h1>
+          <p style={s.subtitle}>Here's the agreement as it would look based on your answers. Review it, then let us know how it looks.</p>
+
+          {sections.map(section => (
+            <div key={section.id} style={s.reviewSection}>
+              <div style={s.reviewSectionTitle}>{section.title}</div>
+              <div style={s.reviewText}>{resolveSectionText(section, fieldValues, fieldsByKey, null)}</div>
+            </div>
+          ))}
+
+          <div style={s.decisionBox}>
+            <label style={s.label}>How does this look?</label>
+            <div style={{ ...s.toggleRow, flexWrap: 'wrap' }}>
+              {DECISIONS.map(d => (
+                <button key={d.key} type="button" style={s.toggleBtn(decision === d.key)} onClick={() => setDecision(d.key)}>{d.label}</button>
+              ))}
+            </div>
+            <label style={{ ...s.label, marginTop: '14px' }}>Comments (optional)</label>
+            <textarea style={s.textarea} value={comment} onChange={e => setComment(e.target.value)} placeholder="Anything you'd like the City to know..." />
+            {decisionError && <div style={{ ...s.errorBox, marginTop: '10px' }}>{decisionError}</div>}
+            <div style={{ marginTop: '14px' }}>
+              <button type="button" style={s.buttonSecondary} onClick={() => setPhase('filling')}>← Back to edit my answers</button>
+              {' '}
+              <button
+                type="button"
+                disabled={!decision || decisionSubmitting}
+                style={!decision || decisionSubmitting ? s.buttonDisabled : s.button}
+                onClick={handleSubmitDecision}
+              >
+                {decisionSubmitting ? 'Submitting…' : 'Submit to the City'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // phase === 'filling'
   return (
     <div style={s.page}>
       <div style={s.card}>
@@ -224,12 +284,11 @@ function MouSubmit() {
         </div>
 
         <h1 style={s.title}>{orgName}</h1>
-        <p style={s.subtitle}>Fill in each section below. Your answers are saved automatically as you go — you can leave and come back anytime using your submission number and PIN.</p>
+        <p style={s.subtitle}>Answer each question below. Your answers are saved automatically as you go — you can leave and come back anytime using your submission number and PIN.</p>
 
         {sections.map(section => (
           <div key={section.id}>
             <div style={s.sectionTitle}>{section.title}</div>
-            <div style={s.lockedText}>{renderLockedText(section.locked_text, fieldValues, fieldsByKey)}</div>
             {(section.field_definitions || []).map(field => {
               if (field.conditional_on && fieldValues[field.conditional_on] !== 'yes') return null
               return (
@@ -275,18 +334,6 @@ function MouSubmit() {
                 </div>
               )
             })}
-            {section.allow_section_comment && (
-              <div style={s.commentBox}>
-                <label style={{ ...s.label, fontSize: '12px', color: '#6b7280' }}>Suggest a change to this section (optional)</label>
-                <textarea
-                  style={{ ...s.textarea, minHeight: '60px' }}
-                  value={sectionComments[section.id] || ''}
-                  onChange={e => handleCommentChange(section.id, e.target.value)}
-                  onBlur={() => handleCommentBlur(section.id)}
-                  placeholder="Explain any requested deviation from the standard language above — you're not editing it directly."
-                />
-              </div>
-            )}
           </div>
         ))}
 
@@ -299,9 +346,9 @@ function MouSubmit() {
           </ul>
         )}
 
-        {submitError && (
+        {continueError && (
           <div style={s.errorBox}>
-            <div>{submitError}</div>
+            <div>{continueError}</div>
             {missingFields.length > 0 && (
               <ul style={{ marginTop: '8px', marginBottom: 0 }}>
                 {missingFields.map((m, i) => <li key={i}>{m}</li>)}
@@ -311,8 +358,8 @@ function MouSubmit() {
         )}
 
         <div style={{ marginTop: '24px' }}>
-          <button onClick={handleSubmit} disabled={submitting} style={submitting ? s.buttonDisabled : s.button}>
-            {submitting ? 'Submitting…' : 'Submit for City Review'}
+          <button onClick={handleContinueToReview} style={s.button}>
+            Continue to Review →
           </button>
         </div>
       </div>
