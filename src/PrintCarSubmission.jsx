@@ -8,7 +8,7 @@ const s = {
   noPrint: { textAlign: 'center', padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' },
   headerRow: { display: 'flex', alignItems: 'flex-start', gap: '16px', paddingTop: '20px', marginBottom: '20px' },
   seal: { width: '80px', height: '81px', flexShrink: 0 },
-  headerText: { flex: 1, textAlign: 'right' },
+  headerText: { flex: 1, textAlign: 'left' },
   cityLine: { fontSize: '16px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 },
   carLine: { fontSize: '16px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '2px 0 4px 0', paddingBottom: '4px', borderBottom: '1px solid #000000' },
   dateLine: { fontSize: '12px', margin: 0 },

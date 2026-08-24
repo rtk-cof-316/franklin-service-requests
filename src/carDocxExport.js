@@ -50,13 +50,13 @@ export async function generateCarDocx(car, meetingDate) {
             width: { size: CONTENT_WIDTH_DXA - 1440, type: WidthType.DXA },
             borders: NO_BORDERS,
             children: [
-              new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'City of Franklin', bold: true, smallCaps: true, size: 32, font: 'Calibri' })] }),
+              new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: 'City of Franklin', bold: true, smallCaps: true, size: 32, font: 'Calibri' })] }),
               new Paragraph({
-                alignment: AlignmentType.RIGHT,
+                alignment: AlignmentType.LEFT,
                 border: { bottom: { style: BorderStyle.SINGLE, size: 4, space: 1, color: '000000' } },
                 children: [new TextRun({ text: 'Council Agenda Report', bold: true, smallCaps: true, size: 32, font: 'Calibri' })],
               }),
-              new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatDate(meetingDate), font: 'Calibri' })] }),
+              new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: formatDate(meetingDate), font: 'Calibri' })] }),
             ],
           }),
         ],
