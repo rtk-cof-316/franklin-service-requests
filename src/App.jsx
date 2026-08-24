@@ -31,6 +31,7 @@ import CarStatus from './CarStatus'
 import AdminCarSubmissions from './AdminCarSubmissions'
 import AdminCarCreate from './AdminCarCreate'
 import CarSubmissionDetail from './CarSubmissionDetail'
+import PrintCarSubmission from './PrintCarSubmission'
 import AdminCarCycles from './AdminCarCycles'
 import CarCycleDetail from './CarCycleDetail'
 import CarBatchReview from './CarBatchReview'
@@ -213,9 +214,14 @@ function App() {
     setPage('print-car-packet')
   }
 
+  function handlePrintCarSubmission(submissionId) {
+    setViewingCarSubmissionId(submissionId)
+    setPage('print-car-submission')
+  }
+
   const isCarAdmin = !!carAdminRole(session?.user?.email)
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet'].includes(page)
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet', 'print-car-submission'].includes(page)
 
   const navBtn = (target, label) => (
     <button
@@ -354,7 +360,10 @@ function App() {
         <CarBatchReview cycleId={viewingCarCycleId} userEmail={session.user.email} onBack={() => setPage('car-cycle-detail')} />
       )}
       {page === 'car-submission-detail' && session && isCarAdmin && viewingCarSubmissionId && (
-        <CarSubmissionDetail submissionId={viewingCarSubmissionId} userEmail={session.user.email} onBack={() => setPage('admin-car')} />
+        <CarSubmissionDetail submissionId={viewingCarSubmissionId} userEmail={session.user.email} onBack={() => setPage('admin-car')} onPrint={handlePrintCarSubmission} />
+      )}
+      {page === 'print-car-submission' && session && isCarAdmin && viewingCarSubmissionId && (
+        <PrintCarSubmission submissionId={viewingCarSubmissionId} onClose={() => setPage('car-submission-detail')} />
       )}
       {page === 'print-car-agenda' && session && isCarAdmin && viewingCarCycleId && (
         <PrintCarAgenda cycleId={viewingCarCycleId} workSessionId={viewingCarWorkSessionId} onClose={() => setPage('car-cycle-detail')} />

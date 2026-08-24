@@ -29,6 +29,10 @@ const s = {
   actionBox: { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '18px 20px', marginTop: '24px' },
   actionBoxTitle: { fontSize: '13px', fontWeight: '700', color: '#1e40af', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' },
   noAccess: { backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '14px 16px', fontSize: '13px', color: '#991b1b', marginTop: '20px' },
+  editableInput: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', marginBottom: '10px' },
+  editableTextarea: { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', minHeight: '70px', fontFamily: 'inherit', resize: 'vertical', marginBottom: '10px' },
+  toggleRow: { display: 'flex', gap: '10px', marginBottom: '10px' },
+  toggleBtn: (active) => ({ padding: '6px 14px', borderRadius: '6px', border: active ? '2px solid #1a56a0' : '1px solid #d1d5db', backgroundColor: active ? '#eff6ff' : '#ffffff', color: active ? '#1a56a0' : '#374151', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }),
 }
 
 async function hashPin(pin) {
@@ -51,8 +55,9 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function CarSubmissionDetail({ submissionId, userEmail, onBack }) {
+function CarSubmissionDetail({ submissionId, userEmail, onBack, onPrint }) {
   const [submission, setSubmission] = useState(null)
+  const [fieldDraft, setFieldDraft] = useState({})
   const [attachments, setAttachments] = useState([])
   const [activityLog, setActivityLog] = useState([])
   const [workSessions, setWorkSessions] = useState([])
@@ -79,6 +84,11 @@ function CarSubmissionDetail({ submissionId, userEmail, onBack }) {
     const { data: sub } = await supabase.from('car_submissions').select('*').eq('id', submissionId).single()
     if (sub) {
       setSubmission(sub)
+      setFieldDraft({
+        from_field: sub.from_field || '', subject: sub.subject || '', history: sub.history || '',
+        recommendation: sub.recommendation || '', suggested_motion: sub.suggested_motion || '',
+        discussion: sub.discussion || '', alternatives: sub.alternatives || '',
+      })
       const [attRes, actRes, wsRes, cyclesRes] = await Promise.all([
         supabase.from('car_attachments').select('*').eq('car_submission_id', submissionId),
         supabase.from('car_activity_log').select('*').eq('car_submission_id', submissionId).order('created_at'),
@@ -103,6 +113,21 @@ function CarSubmissionDetail({ submissionId, userEmail, onBack }) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ANON_KEY}` },
       body: JSON.stringify({ type, submissionNumber: submission.submission_number, subject: submission.subject, ...extra }),
     })
+  }
+
+  function handleFieldChange(key, value) {
+    setFieldDraft(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function handleFieldBlur(key) {
+    if (fieldDraft[key] === (submission[key] || '')) return
+    await supabase.from('car_submissions').update({ [key]: fieldDraft[key] }).eq('id', submissionId)
+    setSubmission(prev => ({ ...prev, [key]: fieldDraft[key] }))
+  }
+
+  async function handleToggleField(key, value) {
+    await supabase.from('car_submissions').update({ [key]: value }).eq('id', submissionId)
+    setSubmission(prev => ({ ...prev, [key]: value }))
   }
 
   async function handleResetPin() {
@@ -220,6 +245,7 @@ function CarSubmissionDetail({ submissionId, userEmail, onBack }) {
         <h1 style={s.title}>{submission.subject || submission.submission_number}</h1>
         <p style={s.subtitle}>{submission.submission_number} · From: {submission.from_field || '—'} · Contact: {submission.submitter_name} ({submission.submitter_email})</p>
         <span style={s.badge}>{CAR_STATUS_LABELS[stage] || stage}</span>
+        <button style={s.buttonSecondary} onClick={() => onPrint(submissionId)}>🖨️ Print / Export</button>
 
         {!role && (
           <div style={s.noAccess}>Your login ({userEmail}) isn't recognized as a CAR administrator.</div>
@@ -243,13 +269,45 @@ function CarSubmissionDetail({ submissionId, userEmail, onBack }) {
         {Object.entries(CAR_FIELD_GUIDANCE).map(([key, field]) => (
           <div key={key}>
             <div style={s.fieldLabel}>{field.label}</div>
-            <div style={s.fieldValue}>{submission[key] || '—'}</div>
+            {role ? (
+              key === 'from_field' || key === 'subject' ? (
+                <input
+                  style={s.editableInput}
+                  value={fieldDraft[key] ?? ''}
+                  onChange={e => handleFieldChange(key, e.target.value)}
+                  onBlur={() => handleFieldBlur(key)}
+                />
+              ) : (
+                <textarea
+                  style={s.editableTextarea}
+                  value={fieldDraft[key] ?? ''}
+                  onChange={e => handleFieldChange(key, e.target.value)}
+                  onBlur={() => handleFieldBlur(key)}
+                />
+              )
+            ) : (
+              <div style={s.fieldValue}>{submission[key] || '—'}</div>
+            )}
           </div>
         ))}
         <div style={s.fieldLabel}>Requires a Resolution</div>
-        <div style={s.fieldValue}>{submission.requires_resolution ? 'Yes' : 'No'}</div>
+        {role ? (
+          <div style={s.toggleRow}>
+            <button type="button" style={s.toggleBtn(submission.requires_resolution)} onClick={() => handleToggleField('requires_resolution', true)}>Yes</button>
+            <button type="button" style={s.toggleBtn(!submission.requires_resolution)} onClick={() => handleToggleField('requires_resolution', false)}>No</button>
+          </div>
+        ) : (
+          <div style={s.fieldValue}>{submission.requires_resolution ? 'Yes' : 'No'}</div>
+        )}
         <div style={s.fieldLabel}>Requires a Public Hearing</div>
-        <div style={s.fieldValue}>{submission.requires_public_hearing ? 'Yes' : 'No'}</div>
+        {role ? (
+          <div style={s.toggleRow}>
+            <button type="button" style={s.toggleBtn(submission.requires_public_hearing)} onClick={() => handleToggleField('requires_public_hearing', true)}>Yes</button>
+            <button type="button" style={s.toggleBtn(!submission.requires_public_hearing)} onClick={() => handleToggleField('requires_public_hearing', false)}>No</button>
+          </div>
+        ) : (
+          <div style={s.fieldValue}>{submission.requires_public_hearing ? 'Yes' : 'No'}</div>
+        )}
 
         <div style={s.sectionTitle}>Attachments</div>
         <CarAttachments carSubmissionId={submissionId} canUpload={false} />
