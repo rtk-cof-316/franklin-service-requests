@@ -396,7 +396,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('case_id, statuses ( name, is_closing )')
+      .select('case_id, created_at, statuses ( name, is_closing )')
       .eq('department_id', departmentId)
 
     if (!caseDepts || caseDepts.length === 0) {
@@ -405,13 +405,29 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
       return
     }
 
-    const caseIds = caseDepts.map(cd => cd.case_id)
+    // A case can have more than one case_departments row for this department if it's been
+    // referred back after an earlier round was already closed — pick whichever row is
+    // currently open for display; if none is open, fall back to the most recently created,
+    // rather than trusting default query order to land on the right one (it doesn't always).
+    const bestRowByCase = {}
+    for (const cd of caseDepts) {
+      const existing = bestRowByCase[cd.case_id]
+      if (!existing) { bestRowByCase[cd.case_id] = cd; continue }
+      const existingOpen = !existing.statuses?.is_closing
+      const candidateOpen = !cd.statuses?.is_closing
+      if (candidateOpen && !existingOpen) { bestRowByCase[cd.case_id] = cd; continue }
+      if (candidateOpen === existingOpen && new Date(cd.created_at) > new Date(existing.created_at)) {
+        bestRowByCase[cd.case_id] = cd
+      }
+    }
+
+    const caseIds = Object.keys(bestRowByCase).map(Number)
     const deptStatusMap = {}
     const deptStatusClosingMap = {}
-    caseDepts.forEach(cd => {
-      deptStatusMap[cd.case_id] = cd.statuses?.name || null
-      deptStatusClosingMap[cd.case_id] = Boolean(cd.statuses?.is_closing)
-    })
+    for (const [caseId, cd] of Object.entries(bestRowByCase)) {
+      deptStatusMap[caseId] = cd.statuses?.name || null
+      deptStatusClosingMap[caseId] = Boolean(cd.statuses?.is_closing)
+    }
 
     const { data, error } = await supabase
       .from('cases')

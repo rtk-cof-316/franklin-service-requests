@@ -158,7 +158,7 @@ const [savingArchive, setSavingArchive] = useState(false)
   async function loadCase() {
     const { data } = await supabase
       .from('cases')
-      .select(`*, statuses ( id, name ), issue_types ( id, name ), case_departments ( id, department_id, departments ( name ), statuses ( id, name, is_closing ) )`)
+      .select(`*, statuses ( id, name ), issue_types ( id, name ), case_departments ( id, department_id, created_at, departments ( name ), statuses ( id, name, is_closing ) )`)
       .eq('id', caseId)
       .single()
     if (data) {
@@ -178,7 +178,15 @@ const [savingArchive, setSavingArchive] = useState(false)
       setDeptStatusEdits(edits)
       if (data.is_91a) loadRtkData()
       if (userRole === 'department' && userDepartmentId) {
-        const myAssignment = data.case_departments?.find(cd => cd.department_id === userDepartmentId)
+        // A department can end up with more than one case_departments row for the same case
+        // if it's referred back to after already closing out an earlier round (or added twice
+        // some other way) — .find() would grab whichever row the DB happens to return first,
+        // which is not reliably the newest one and can surface a stale closed assignment
+        // instead of the active one just created by a referral. Prefer the currently-open row;
+        // if none is open (a fully historical case), fall back to the most recently created.
+        const myAssignments = (data.case_departments || []).filter(cd => cd.department_id === userDepartmentId)
+        const myAssignment = myAssignments.find(cd => !cd.statuses?.is_closing)
+          || myAssignments.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
         if (myAssignment) { setMyDeptAssignment(myAssignment); setDeptSelectedStatus(myAssignment.statuses?.id || '') }
       }
     }
