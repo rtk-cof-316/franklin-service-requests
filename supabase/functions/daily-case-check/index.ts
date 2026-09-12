@@ -16,6 +16,22 @@ function latestDate(...dates: (string | null | undefined)[]): string {
   return dates.filter(Boolean).sort().pop() as string
 }
 
+// Departments like Fire/Code routinely give a violator 15/30/60+ days to correct an issue
+// before they're expected to comment again — that's cases.followup_due_date. Without this,
+// the silence reminders/escalations below fire during that legitimate waiting period, even
+// though the department isn't actually behind on anything. While that date hasn't passed
+// yet, skip both checks entirely for the case; once it passes, the normal silence check
+// resumes exactly as it would for any other case (based on real last activity, not reset to
+// the follow-up date) — so if a department truly did nothing during a long correction
+// window, crossing the deadline can still escalate right away, which is the intended
+// "warnings aren't gone, just paused while a correction window is legitimately open" behavior.
+function inFollowupGracePeriod(cd: any): boolean {
+  const followupDueDate: string | null | undefined = cd.cases?.followup_due_date
+  if (!followupDueDate) return false
+  const today = new Date().toISOString().slice(0, 10)
+  return followupDueDate.slice(0, 10) >= today
+}
+
 async function sendBrevoEmail(brevoKey: string, to: string, subject: string, htmlContent: string) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
@@ -42,7 +58,7 @@ Deno.serve(async (req) => {
   const cmDepartmentId = cmDeptRows?.[0]?.id ?? null
 
   const cdRes = await fetch(
-    `${supabaseUrl}/rest/v1/case_departments?select=id,case_id,department_id,status_changed_at,created_at,escalated_at,departments(name),statuses(name,is_closing),cases(case_number,location,description)`,
+    `${supabaseUrl}/rest/v1/case_departments?select=id,case_id,department_id,status_changed_at,created_at,escalated_at,departments(name),statuses(name,is_closing),cases(case_number,location,description,followup_due_date)`,
     { headers: authHeaders }
   )
   const caseDepts = await cdRes.json()
@@ -89,6 +105,7 @@ Deno.serve(async (req) => {
   const reminderGroups: Record<string, { departmentId: number; departmentName: string; cases: any[] }> = {}
 
   for (const cd of openAssignments) {
+    if (inFollowupGracePeriod(cd)) continue
     const days = daysSince(cd.lastActivityAt)
     if (days < 3 || days % 3 !== 0) continue
     const deptName = cd.departments?.name
@@ -165,6 +182,7 @@ Deno.serve(async (req) => {
   // activity since the last escalation (meaning a new 2-week silence window has since elapsed).
   let escalationsFired = 0
   for (const cd of openAssignments) {
+    if (inFollowupGracePeriod(cd)) continue
     const daysQuiet = daysSince(cd.lastActivityAt)
     if (daysQuiet < 14) continue
     if (cd.escalated_at && cd.escalated_at >= cd.lastActivityAt) continue
