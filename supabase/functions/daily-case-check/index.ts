@@ -99,6 +99,13 @@ Deno.serve(async (req) => {
       lastNoteByCase[cd.case_id],
       cd.created_at,
     )
+    // Once a follow-up date has passed, don't count the whole waiting period as silence —
+    // that would let the 3-day/14-day clocks fire the instant the deadline closes, which is
+    // exactly the "bothered the moment their case expires" behavior we're avoiding. Treat the
+    // deadline itself as the reset point (unless there's genuinely more recent real
+    // activity), so a passed follow-up date behaves like a fresh last-activity timestamp and
+    // the normal 3-day/14-day cadence starts counting from there.
+    cd.effectiveActivityAt = latestDate(cd.lastActivityAt, cd.cases?.followup_due_date)
   }
 
   // ─── 3-Day Silence Reminders (grouped per department, one digest email) ───
@@ -106,7 +113,7 @@ Deno.serve(async (req) => {
 
   for (const cd of openAssignments) {
     if (inFollowupGracePeriod(cd)) continue
-    const days = daysSince(cd.lastActivityAt)
+    const days = daysSince(cd.effectiveActivityAt)
     if (days < 3 || days % 3 !== 0) continue
     const deptName = cd.departments?.name
     if (!deptName) continue
@@ -183,9 +190,9 @@ Deno.serve(async (req) => {
   let escalationsFired = 0
   for (const cd of openAssignments) {
     if (inFollowupGracePeriod(cd)) continue
-    const daysQuiet = daysSince(cd.lastActivityAt)
+    const daysQuiet = daysSince(cd.effectiveActivityAt)
     if (daysQuiet < 14) continue
-    if (cd.escalated_at && cd.escalated_at >= cd.lastActivityAt) continue
+    if (cd.escalated_at && cd.escalated_at >= cd.effectiveActivityAt) continue
 
     const deptName = cd.departments?.name
     const caseNumber = cd.cases?.case_number
