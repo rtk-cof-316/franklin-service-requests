@@ -5,6 +5,11 @@
 const DEPARTMENT_EMAIL_OVERRIDES: Record<string, string[]> = {
   'City Manager': ['bdemers@franklinnh.gov', 'citymgr@franklinnh.gov'],
   'IT': ['bdemers@franklinnh.gov'],
+  // Assessing has one real user_profiles account (assessingdept@franklinnh.gov, split out
+  // of the old PZA department bucket on 2026-09-17) plus everyone currently on Fire/Code —
+  // a one-time snapshot of Fire/Code's roster as of 2026-09-17, not a live mirror. If
+  // Fire/Code's roster changes later, update this list by hand to match.
+  'Assessing': ['AssessingDept@franklinnh.gov', 'mfoss@franklinnh.gov', 'sbreault@franklinnh.gov', 'dhall@franklinnh.gov', 'fdoffice@franklinnh.gov'],
 }
 
 export async function resolveDepartmentRecipients(
