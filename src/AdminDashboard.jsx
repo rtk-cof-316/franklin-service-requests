@@ -288,6 +288,10 @@ function AdminDashboard({ onViewCase, refreshKey }) {
   const [statusFilter, setStatusFilter] = useState('open')
   const [deptFilter, setDeptFilter] = useState('all')
   const [issueTypeFilter, setIssueTypeFilter] = useState('all')
+  const [escalatedFilter, setEscalatedFilter] = useState('all')
+  const [networkFolderFilter, setNetworkFolderFilter] = useState('all')
+  const [initialExportFilter, setInitialExportFilter] = useState('all')
+  const [closedExportFilter, setClosedExportFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState([])
   const [departments, setDepartments] = useState([])
@@ -327,9 +331,10 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       .select(`
         id, case_number, date_submitted, location, description, is_91a,
         followup_due_date, closed_date,
+        archive_network_folder, archive_initial_export, archive_closed_export,
         statuses ( name, is_closing ),
         issue_types ( name ),
-        case_departments ( departments ( name ), statuses ( name, is_closing ) )
+        case_departments ( departments ( name ), statuses ( name, is_closing ), escalated_at )
       `)
       .order('date_submitted', { ascending: false })
     if (!error) setCases(data || [])
@@ -621,6 +626,13 @@ ${Object.keys(deptSummary).map(dept => {
       if (!assignedDepts.includes(deptFilter)) return false
     }
     if (issueTypeFilter !== 'all' && c.issue_types?.name !== issueTypeFilter) return false
+    if (escalatedFilter === 'escalated' && !c.case_departments?.some(cd => cd.escalated_at)) return false
+    if (networkFolderFilter === 'done' && !c.archive_network_folder) return false
+    if (networkFolderFilter === 'not_done' && c.archive_network_folder) return false
+    if (initialExportFilter === 'done' && !c.archive_initial_export) return false
+    if (initialExportFilter === 'not_done' && c.archive_initial_export) return false
+    if (closedExportFilter === 'done' && !c.archive_closed_export) return false
+    if (closedExportFilter === 'not_done' && c.archive_closed_export) return false
     if (search.trim()) {
       const s = search.toLowerCase()
       return (
@@ -760,6 +772,25 @@ ${Object.keys(deptSummary).map(dept => {
             <select value={issueTypeFilter} onChange={e => setIssueTypeFilter(e.target.value)} style={styles.filterSelect}>
               <option value="all">All Issue Types</option>
               {issueTypeOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+            </select>
+            <select value={escalatedFilter} onChange={e => setEscalatedFilter(e.target.value)} style={styles.filterSelect}>
+              <option value="all">All Cases</option>
+              <option value="escalated">Escalated to CM</option>
+            </select>
+            <select value={networkFolderFilter} onChange={e => setNetworkFolderFilter(e.target.value)} style={styles.filterSelect}>
+              <option value="all">Network Folder: All</option>
+              <option value="done">Network Folder: Created</option>
+              <option value="not_done">Network Folder: Not Created</option>
+            </select>
+            <select value={initialExportFilter} onChange={e => setInitialExportFilter(e.target.value)} style={styles.filterSelect}>
+              <option value="all">Initial Export: All</option>
+              <option value="done">Initial Export: Complete</option>
+              <option value="not_done">Initial Export: Not Complete</option>
+            </select>
+            <select value={closedExportFilter} onChange={e => setClosedExportFilter(e.target.value)} style={styles.filterSelect}>
+              <option value="all">Closed Export: All</option>
+              <option value="done">Closed Export: Complete</option>
+              <option value="not_done">Closed Export: Not Complete</option>
             </select>
           </div>
         </div>
