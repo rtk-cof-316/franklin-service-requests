@@ -20,8 +20,12 @@ function latestDate(...dates) {
   return dates.filter(Boolean).sort().pop() || null
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 const s = {
-  page: { fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#111827', maxWidth: '900px', margin: '0 auto', padding: '0' },
+  page: { fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#111827', maxWidth: '960px', margin: '0 auto', padding: '0' },
   noPrint: { textAlign: 'center', padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' },
   header: { backgroundColor: '#991b1b', color: '#ffffff', padding: '20px 28px' },
   headerTitle: { margin: '0 0 4px 0', fontSize: '19px', fontWeight: '700' },
@@ -35,9 +39,26 @@ const s = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '11px' },
   th: { padding: '7px 10px', backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: '700', textAlign: 'left', border: '1px solid #bfdbfe', textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px' },
   td: { padding: '7px 10px', border: '1px solid #e5e7eb', verticalAlign: 'top' },
+  movementDate: { fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' },
+  movementDetail: { color: '#374151', marginTop: '2px' },
   reasonText: { color: '#991b1b' },
   empty: { padding: '60px', textAlign: 'center', color: '#6b7280' },
   footer: { textAlign: 'center', fontSize: '10px', color: '#9ca3af', padding: '16px 0', borderTop: '1px solid #e5e7eb', marginTop: '12px' },
+}
+
+// A department's status-change audit entries read "<Dept> status changed from "X" to "Y""
+// (self-service) or "<Dept> status updated from "X" to "Y" by admin" (admin per-row edit) —
+// same wording CaseDetail.jsx writes in both handleSaveDeptStatus/handleSaveDeptStatusAdmin.
+// No timestamp ceiling against status_changed_at: the audit log write happens in a
+// separate, slightly-later await than the case_departments update, so filtering by
+// "created_at <= status_changed_at" can miss the very entry it's looking for. Since the
+// pattern is anchored to one specific department and every status change writes both
+// fields together, the single latest matching entry always corresponds to the current
+// status — verified against real data before relying on this.
+function findStatusChangeAuditEntry(auditEntries, departmentName) {
+  const pattern = new RegExp(`^${escapeRegex(departmentName)} status (?:changed|updated) from ".*?" to "(.+?)"`)
+  const matches = auditEntries.filter(a => pattern.test(a.action))
+  return matches.length > 0 ? matches[matches.length - 1] : null
 }
 
 function PrintEscalatedCasesReport({ onClose }) {
@@ -54,21 +75,27 @@ function PrintEscalatedCasesReport({ onClose }) {
 
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('id, case_id, department_id, escalated_at, status_changed_at, created_at, departments(name), statuses(is_closing), cases(case_number, description, date_submitted)')
+      .select('id, case_id, department_id, escalated_at, status_changed_at, created_at, departments(name), statuses(name, is_closing), cases(case_number, description, date_submitted, issue_types(name))')
       .not('escalated_at', 'is', null)
 
     const escalatedRows = caseDepts?.filter(cd => !cd.statuses?.is_closing) || []
 
     let commentsByKey = {}
+    let auditByCase = {}
     if (escalatedRows.length > 0) {
       const caseIds = [...new Set(escalatedRows.map(cd => cd.case_id))]
-      const { data: comments } = await supabase
-        .from('case_comments')
-        .select('case_id, department_id, created_at')
-        .in('case_id', caseIds)
+      const [{ data: comments }, { data: auditEntries }] = await Promise.all([
+        supabase.from('case_comments').select('case_id, department_id, comment, created_by, created_at').in('case_id', caseIds),
+        supabase.from('case_audit_log').select('case_id, action, performed_by, created_at').in('case_id', caseIds).order('created_at', { ascending: true }),
+      ])
       for (const c of comments || []) {
         const key = `${c.case_id}:${c.department_id}`
-        commentsByKey[key] = latestDate(commentsByKey[key], c.created_at)
+        const existing = commentsByKey[key]
+        if (!existing || c.created_at > existing.created_at) commentsByKey[key] = c
+      }
+      for (const a of auditEntries || []) {
+        if (!auditByCase[a.case_id]) auditByCase[a.case_id] = []
+        auditByCase[a.case_id].push(a)
       }
     }
 
@@ -78,9 +105,22 @@ function PrintEscalatedCasesReport({ onClose }) {
     // here just because escalated_at is never cleared.
     const stillEscalated = escalatedRows
       .map(cd => {
-        const lastComment = commentsByKey[`${cd.case_id}:${cd.department_id}`] || null
-        const lastMovementAt = latestDate(cd.status_changed_at, lastComment, cd.created_at)
-        return { ...cd, lastMovementAt }
+        const lastCommentRow = commentsByKey[`${cd.case_id}:${cd.department_id}`] || null
+        const lastCommentAt = lastCommentRow?.created_at || null
+        const lastMovementAt = latestDate(cd.status_changed_at, lastCommentAt, cd.created_at)
+
+        let movement
+        if (lastCommentAt && lastMovementAt === lastCommentAt) {
+          movement = { type: 'comment', by: lastCommentRow.created_by, text: lastCommentRow.comment }
+        } else if (cd.status_changed_at && lastMovementAt === cd.status_changed_at) {
+          const deptName = cd.departments?.name
+          const auditEntry = findStatusChangeAuditEntry(auditByCase[cd.case_id] || [], deptName)
+          movement = { type: 'status', by: auditEntry?.performed_by || null, statusName: cd.statuses?.name }
+        } else {
+          movement = { type: 'none' }
+        }
+
+        return { ...cd, lastMovementAt, movement }
       })
       .filter(cd => cd.escalated_at >= cd.lastMovementAt)
 
@@ -101,6 +141,19 @@ function PrintEscalatedCasesReport({ onClose }) {
     setGroups(groupList)
     setTotalCount(stillEscalated.length)
     setLoading(false)
+  }
+
+  function renderMovement(cd) {
+    const { movement } = cd
+    if (movement.type === 'comment') {
+      return <>Public comment by <strong>{movement.by}</strong>: "{movement.text}"</>
+    }
+    if (movement.type === 'status') {
+      return movement.by
+        ? <>Status changed to "<strong>{movement.statusName}</strong>" by <strong>{movement.by}</strong></>
+        : <>Status changed to "<strong>{movement.statusName}</strong>"</>
+    }
+    return <>No activity since assigned on {formatDate(cd.created_at)}</>
   }
 
   const reportDate = formatDateTime(new Date().toISOString())
@@ -148,6 +201,7 @@ function PrintEscalatedCasesReport({ onClose }) {
                     <thead>
                       <tr>
                         <th style={s.th}>Case #</th>
+                        <th style={s.th}>Issue Type</th>
                         <th style={s.th}>Description</th>
                         <th style={s.th}>Date Created</th>
                         <th style={s.th}>Last Movement</th>
@@ -158,9 +212,13 @@ function PrintEscalatedCasesReport({ onClose }) {
                       {group.rows.map(cd => (
                         <tr key={cd.id}>
                           <td style={{ ...s.td, fontWeight: '700', color: '#1a56a0', whiteSpace: 'nowrap' }}>#{cd.cases?.case_number}</td>
-                          <td style={{ ...s.td, maxWidth: '260px' }}>{(cd.cases?.description || '—').slice(0, 400)}</td>
+                          <td style={{ ...s.td, whiteSpace: 'nowrap' }}>{cd.cases?.issue_types?.name || '—'}</td>
+                          <td style={{ ...s.td, maxWidth: '220px' }}>{(cd.cases?.description || '—').slice(0, 400)}</td>
                           <td style={{ ...s.td, whiteSpace: 'nowrap' }}>{formatDate(cd.cases?.date_submitted)}</td>
-                          <td style={{ ...s.td, whiteSpace: 'nowrap' }}>{formatDate(cd.lastMovementAt)}</td>
+                          <td style={{ ...s.td, minWidth: '200px' }}>
+                            <div style={s.movementDate}>{formatDate(cd.lastMovementAt)}</div>
+                            <div style={s.movementDetail}>{renderMovement(cd)}</div>
+                          </td>
                           <td style={{ ...s.td, ...s.reasonText }}>
                             No status change or public comment in {daysSince(cd.lastMovementAt)} days — escalated {formatDate(cd.escalated_at)}.
                           </td>
