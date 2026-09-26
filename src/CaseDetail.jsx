@@ -619,7 +619,13 @@ async function handleArchiveCheckbox(field, value, label) {
   if (!caseData) return <div style={styles.loading}>Case not found.</div>
 
   const assignedDeptNames = caseData.case_departments?.map(cd => cd.departments?.name) || []
+  // "Add department" should still exclude departments already on the case (no duplicate
+  // parallel assignments). Referring is different — handing a case back to a department
+  // that already had (and finished) an earlier round on it is a normal, expected loop
+  // (e.g. PZ -> Fire/Code -> PZ), so referral targets exclude only the department doing
+  // the referring, never the case's full history.
   const availableDepts = departments.filter(d => !assignedDeptNames.includes(d.name))
+  const referableDepts = (excludeDeptName) => departments.filter(d => d.name !== excludeDeptName)
   const showAppointment = APPOINTMENT_METHODS.includes(rtkFields.delivery_method)
   const totalTimeMinutes = timeLog.reduce((sum, e) => sum + e.minutes, 0)
   const totalTimeCost = timeLog.reduce((sum, e) => sum + parseFloat(e.cost), 0)
@@ -1094,7 +1100,7 @@ async function handleArchiveCheckbox(field, value, label) {
                     <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Refer To Department</div>
                     <select style={styles.select} value={referTargetDept} onChange={e => setReferTargetDept(e.target.value)}>
                       <option value="">-- Select department --</option>
-                      {availableDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      {referableDepts(myDeptAssignment?.departments?.name).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </>
                 )}
@@ -1148,7 +1154,7 @@ async function handleArchiveCheckbox(field, value, label) {
                             onChange={e => setAdminReferTargetDept(prev => ({ ...prev, [cd.id]: e.target.value }))}
                           >
                             <option value="">-- Refer to department --</option>
-                            {availableDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            {referableDepts(cd.departments?.name).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                           </select>
                         )}
                       </div>
