@@ -70,33 +70,26 @@ Deno.serve(async (req) => {
     })
   }
 
-  // A department is "working on it" if there's been a status change, a public comment, or an
-  // internal note on the case — not just a formal status change. Pull the latest of each per
-  // case (bulk, not N+1) and combine with each assignment's own status_changed_at/created_at.
+  // Valid movement is a status change or a public comment — both are visible to the
+  // requester and show real progress on the case. An internal note is not public-facing,
+  // so it deliberately does NOT reset this clock (matches the same rule the admin/department
+  // dashboards use for their "needs attention" flags). Pull the latest comment per case in
+  // bulk (not N+1) and combine with each assignment's own status_changed_at/created_at.
   const caseIds = [...new Set(openAssignments.map((cd: any) => cd.case_id))]
   const caseIdFilter = `in.(${caseIds.join(',')})`
 
-  const [commentsRes, notesRes] = await Promise.all([
-    fetch(`${supabaseUrl}/rest/v1/case_comments?select=case_id,created_at&case_id=${caseIdFilter}`, { headers: authHeaders }),
-    fetch(`${supabaseUrl}/rest/v1/internal_notes?select=case_id,created_at&case_id=${caseIdFilter}`, { headers: authHeaders }),
-  ])
+  const commentsRes = await fetch(`${supabaseUrl}/rest/v1/case_comments?select=case_id,created_at&case_id=${caseIdFilter}`, { headers: authHeaders })
   const comments = await commentsRes.json()
-  const notes = await notesRes.json()
 
   const lastCommentByCase: Record<string, string> = {}
   for (const c of comments || []) {
     lastCommentByCase[c.case_id] = latestDate(lastCommentByCase[c.case_id], c.created_at)
-  }
-  const lastNoteByCase: Record<string, string> = {}
-  for (const n of notes || []) {
-    lastNoteByCase[n.case_id] = latestDate(lastNoteByCase[n.case_id], n.created_at)
   }
 
   for (const cd of openAssignments) {
     cd.lastActivityAt = latestDate(
       cd.status_changed_at,
       lastCommentByCase[cd.case_id],
-      lastNoteByCase[cd.case_id],
       cd.created_at,
     )
     // Once a follow-up date has passed, don't count the whole waiting period as silence —

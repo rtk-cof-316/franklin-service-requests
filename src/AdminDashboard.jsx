@@ -330,51 +330,50 @@ function AdminDashboard({ onViewCase, refreshKey }) {
 
   async function loadAccountability() {
     setAccountabilityLoading(true)
-    // Get all open cases with their departments and comments
+    // Track accountability per department ASSIGNMENT (case_departments row), not per case —
+    // a department whose own assignment is already closed (e.g. referred out) shouldn't be
+    // counted just because the case as a whole is still open under some other department.
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('case_id, department_id, departments ( name ), statuses ( name )')
+      .select('case_id, department_id, status_changed_at, departments ( name ), statuses ( name, is_closing )')
 
-    const { data: openCases } = await supabase
+    const { data: allCases } = await supabase
       .from('cases')
-      .select('id, date_submitted, status_id, statuses ( name, is_closing )')
+      .select('id, date_submitted')
 
     const { data: allComments } = await supabase
       .from('case_comments')
-      .select('case_id, created_at, department_id')
+      .select('case_id, department_id')
 
-    if (!caseDepts || !openCases) {
+    if (!caseDepts || !allCases) {
       setAccountabilityLoading(false)
       return
     }
 
-    const openCaseIds = new Set(
-      openCases
-        .filter(c => !c.statuses?.is_closing)
-        .map(c => c.id)
-    )
+    const dateSubmittedByCaseId = {}
+    allCases.forEach(c => { dateSubmittedByCaseId[c.id] = c.date_submitted })
 
-    const commentsByCaseId = {}
-    allComments?.forEach(c => {
-      if (!commentsByCaseId[c.case_id]) commentsByCaseId[c.case_id] = []
-      commentsByCaseId[c.case_id].push({ created_at: c.created_at, department_id: c.department_id })
-    })
+    const hasCommentByCaseAndDept = new Set(
+      (allComments || []).map(c => `${c.case_id}:${c.department_id}`)
+    )
 
     const deptMap = {}
     caseDepts.forEach(cd => {
-      if (!openCaseIds.has(cd.case_id)) return
+      // A status change is real, public-visible movement just like a comment is — only
+      // count against a department if it's shown NEITHER since being assigned. Once a
+      // department's own row is closed (done/referred out), it's no longer theirs to track.
+      if (cd.statuses?.is_closing) return
       const deptName = cd.departments?.name
       if (!deptName) return
       if (!deptMap[deptName]) {
         deptMap[deptName] = { department: deptName, open_cases: 0, no_comment: 0, over_7_days: 0 }
       }
       deptMap[deptName].open_cases++
-      const caseComments = commentsByCaseId[cd.case_id] || []
-      const hasComment = caseComments.some(c => c.department_id === cd.department_id)
-      const caseData = openCases.find(c => c.id === cd.case_id)
-      const daysOpen = daysSince(caseData?.date_submitted)
-      if (!hasComment) {
+      const hasComment = hasCommentByCaseAndDept.has(`${cd.case_id}:${cd.department_id}`)
+      const hasStatusChange = Boolean(cd.status_changed_at)
+      if (!hasComment && !hasStatusChange) {
         deptMap[deptName].no_comment++
+        const daysOpen = daysSince(dateSubmittedByCaseId[cd.case_id])
         if (daysOpen >= 7) deptMap[deptName].over_7_days++
       }
     })
@@ -413,7 +412,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     // Get full data for report
     const { data: allCaseDepts } = await supabase
       .from('case_departments')
-      .select('case_id, department_id, departments ( name )')
+      .select('case_id, department_id, status_changed_at, departments ( name ), statuses ( is_closing )')
 
     const { data: allCases } = await supabase
       .from('cases')
@@ -460,16 +459,18 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       }
     })
 
-    // Build open case detail rows
+    // Build open case detail rows — scoped to each department's OWN assignment being open
+    // (not just the case overall), and "needs attention" means neither a comment nor a
+    // status change, since a status change is real public-visible movement too.
     const openCaseRows = []
     allCaseDepts?.forEach(cd => {
+      if (cd.statuses?.is_closing) return
       const deptName = cd.departments?.name
       const c = allCases?.find(x => x.id === cd.case_id)
       if (!c) return
-      const isOpen = !c.statuses?.is_closing
-      if (!isOpen) return
       const comments = commentsByCaseId[c.id] || []
       const lastComment = comments.length > 0 ? new Date(comments[0].created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+      const hasStatusChange = Boolean(cd.status_changed_at)
       const daysOpen = daysSince(c.date_submitted)
       openCaseRows.push({
         case_number: c.case_number,
@@ -480,7 +481,8 @@ function AdminDashboard({ onViewCase, refreshKey }) {
         location: c.location || '—',
         description: (c.description || '').slice(0, 500),
         last_comment: lastComment,
-        no_comment: !lastComment,
+        has_status_change: hasStatusChange,
+        no_comment: !lastComment && !hasStatusChange,
       })
     })
 
@@ -537,8 +539,8 @@ function AdminDashboard({ onViewCase, refreshKey }) {
       <th>Total Cases YTD</th>
       <th>Currently Open</th>
       <th>Avg Days to Close</th>
-      <th>Open w/ No Public Comment</th>
-      <th>Open 7+ Days, No Comment</th>
+      <th>Open w/ No Status Change or Comment</th>
+      <th>Open 7+ Days, No Update</th>
     </tr>
   </thead>
   <tbody>
@@ -572,7 +574,7 @@ ${Object.keys(deptSummary).map(dept => {
           <th>Issue Type</th>
           <th>Location</th>
           <th>Description</th>
-          <th>Last Public Comment</th>
+          <th>Last Update</th>
         </tr>
       </thead>
       <tbody>
@@ -583,7 +585,7 @@ ${Object.keys(deptSummary).map(dept => {
           <td>${c.issue_type}</td>
           <td>${(c.location || '—').slice(0, 100)}${c.location?.length > 100 ? '...' : ''}</td>
           <td style="max-width:200px">${c.description}</td>
-          <td>${c.no_comment ? '<span class="badge-red">No comment</span>' : `<span class="badge-green">${c.last_comment}</span>`}</td>
+          <td>${c.last_comment ? `<span class="badge-green">${c.last_comment}</span>` : c.has_status_change ? '<span class="badge-green">Status updated</span>' : '<span class="badge-red">No update</span>'}</td>
         </tr>`).join('')}
       </tbody>
     </table>
@@ -697,7 +699,7 @@ ${Object.keys(deptSummary).map(dept => {
               <tr>
                 <th style={styles.th}>Department</th>
                 <th style={styles.th}>Open Cases</th>
-                <th style={styles.th}>No Public Comment</th>
+                <th style={styles.th}>No Status Change or Comment</th>
                 <th style={styles.th}>Silent 7+ Days</th>
               </tr>
             </thead>

@@ -396,7 +396,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
 
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('case_id, created_at, statuses ( name, is_closing )')
+      .select('case_id, created_at, status_changed_at, statuses ( name, is_closing )')
       .eq('department_id', departmentId)
 
     if (!caseDepts || caseDepts.length === 0) {
@@ -424,9 +424,11 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     const caseIds = Object.keys(bestRowByCase).map(Number)
     const deptStatusMap = {}
     const deptStatusClosingMap = {}
+    const deptStatusChangedMap = {}
     for (const [caseId, cd] of Object.entries(bestRowByCase)) {
       deptStatusMap[caseId] = cd.statuses?.name || null
       deptStatusClosingMap[caseId] = Boolean(cd.statuses?.is_closing)
+      deptStatusChangedMap[caseId] = Boolean(cd.status_changed_at)
     }
 
     const { data, error } = await supabase
@@ -440,10 +442,14 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         ...c,
         dept_status: deptStatusMap[c.id] || null,
         dept_status_is_closing: deptStatusClosingMap[c.id] || false,
+        dept_status_has_changed: deptStatusChangedMap[c.id] || false,
       }))
       setCases(enriched)
 
-      // Calculate urgent cases — open with no public comment for 7+ days
+      // Calculate urgent cases — open, with no status change AND no public comment for
+      // 7+ days. A status change is real, public-visible movement just like a comment is
+      // (both show up to the requester) — a department that's been actively moving a case
+      // through statuses shouldn't be flagged just because they haven't also left a comment.
       const openCaseIds = enriched
         .filter(c => !c.dept_status_is_closing)
         .map(c => c.id)
@@ -457,9 +463,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         const casesWithComments = new Set(comments?.map(c => c.case_id) || [])
         const urgentCases = enriched.filter(c => {
           const isOpen = !c.dept_status_is_closing
-          const hasNoComment = !casesWithComments.has(c.id)
+          const hasMovement = casesWithComments.has(c.id) || c.dept_status_has_changed
           const daysOpen = daysSince(c.date_submitted)
-          return isOpen && hasNoComment && daysOpen >= 7
+          return isOpen && !hasMovement && daysOpen >= 7
         })
         setUrgentCount(urgentCases.length)
         setUrgentCaseIds(new Set(urgentCases.map(c => c.id)))
@@ -538,10 +544,10 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
           <div style={styles.urgentIcon}>🚨</div>
           <div>
             <div style={styles.urgentText}>
-              {urgentCount} open case{urgentCount !== 1 ? 's have' : ' has'} not received a public update in over 7 days.
+              {urgentCount} open case{urgentCount !== 1 ? 's have' : ' has'} had no status change or public comment in over 7 days.
             </div>
             <div style={styles.urgentSub}>
-              Please open these cases and post a public update so residents can see that work is in progress. Use the "Needs Public Update" filter to find them quickly.
+              Please open these cases and either update the status or post a public comment so residents can see that work is in progress. Use the "Needs Update" filter to find them quickly.
             </div>
           </div>
         </div>
@@ -683,7 +689,7 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
             />
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={styles.filterSelect}>
               <option value="open">Open Cases</option>
-              <option value="urgent">⚠️ Needs Public Update ({urgentCount})</option>
+              <option value="urgent">⚠️ Needs Update ({urgentCount})</option>
               <option value="closed">Closed Cases</option>
               <option value="all">All Cases</option>
             </select>
