@@ -285,11 +285,13 @@ function daysSince(dateStr) {
 function AdminDashboard({ onViewCase, refreshKey }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('open')
   const [deptFilter, setDeptFilter] = useState('all')
+  const [issueTypeFilter, setIssueTypeFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [statuses, setStatuses] = useState([])
   const [departments, setDepartments] = useState([])
+  const [issueTypeOptions, setIssueTypeOptions] = useState([])
   const [accountability, setAccountability] = useState([])
   const [accountabilityLoading, setAccountabilityLoading] = useState(true)
   const [exportingReport, setExportingReport] = useState(false)
@@ -299,6 +301,7 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     loadCases()
     loadStatuses()
     loadDepartments()
+    loadIssueTypeOptions()
     loadAccountability()
   }, [refreshKey])
 
@@ -310,6 +313,11 @@ function AdminDashboard({ onViewCase, refreshKey }) {
   async function loadDepartments() {
     const { data } = await supabase.from('departments').select('*').order('name')
     setDepartments(data || [])
+  }
+
+  async function loadIssueTypeOptions() {
+    const { data } = await supabase.from('issue_types').select('*').order('name')
+    setIssueTypeOptions(data || [])
   }
 
   async function loadCases() {
@@ -612,6 +620,7 @@ ${Object.keys(deptSummary).map(dept => {
       const assignedDepts = c.case_departments?.map(cd => cd.departments?.name) || []
       if (!assignedDepts.includes(deptFilter)) return false
     }
+    if (issueTypeFilter !== 'all' && c.issue_types?.name !== issueTypeFilter) return false
     if (search.trim()) {
       const s = search.toLowerCase()
       return (
@@ -747,6 +756,10 @@ ${Object.keys(deptSummary).map(dept => {
             <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={styles.filterSelect}>
               <option value="all">All Departments</option>
               {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </select>
+            <select value={issueTypeFilter} onChange={e => setIssueTypeFilter(e.target.value)} style={styles.filterSelect}>
+              <option value="all">All Issue Types</option>
+              {issueTypeOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
             </select>
           </div>
         </div>
