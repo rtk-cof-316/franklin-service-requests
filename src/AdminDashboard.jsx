@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
-
-const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 
 const styles = {
   page: {
@@ -244,17 +241,6 @@ const styles = {
     fontSize: '14px',
     fontStyle: 'italic',
   },
-  exportBtn: {
-    padding: '7px 16px',
-    backgroundColor: '#dc2626',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  },
 }
 
 function getStatusStyle(name) {
@@ -298,8 +284,6 @@ function AdminDashboard({ onViewCase, refreshKey }) {
   const [issueTypeOptions, setIssueTypeOptions] = useState([])
   const [accountability, setAccountability] = useState([])
   const [accountabilityLoading, setAccountabilityLoading] = useState(true)
-  const [exportingReport, setExportingReport] = useState(false)
-  const [exportingTimeline, setExportingTimeline] = useState(false)
 
   useEffect(() => {
     loadCases()
@@ -396,227 +380,6 @@ function AdminDashboard({ onViewCase, refreshKey }) {
     setAccountabilityLoading(false)
   }
 
-  async function handleExportTimeline() {
-    setExportingTimeline(true)
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/export-case-timeline`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({}),
-      })
-      const rows = await res.json()
-      const ws = XLSX.utils.json_to_sheet(rows)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Case Timeline')
-      XLSX.writeFile(wb, `case-timeline-review-${new Date().toISOString().slice(0, 10)}.xlsx`)
-    } catch (e) {
-      console.error('Timeline export error:', e)
-      alert('Export failed. Please try again.')
-    }
-    setExportingTimeline(false)
-  }
-
-  async function handleExportReport() {
-    setExportingReport(true)
-
-    // Get full data for report
-    const { data: allCaseDepts } = await supabase
-      .from('case_departments')
-      .select('case_id, department_id, status_changed_at, departments ( name ), statuses ( is_closing )')
-
-    const { data: allCases } = await supabase
-      .from('cases')
-      .select('id, case_number, date_submitted, closed_date, location, description, statuses ( name, is_closing ), issue_types ( name )')
-
-    const { data: allComments } = await supabase
-      .from('case_comments')
-      .select('case_id, created_at')
-      .order('created_at', { ascending: false })
-
-    const commentsByCaseId = {}
-    allComments?.forEach(c => {
-      if (!commentsByCaseId[c.case_id]) commentsByCaseId[c.case_id] = []
-      commentsByCaseId[c.case_id].push(c.created_at)
-    })
-
-    const currentYear = new Date().getFullYear()
-    const startOfYear = new Date(`${currentYear}-01-01`)
-
-    // Build dept summary
-    const deptSummary = {}
-    departments.forEach(d => {
-      deptSummary[d.name] = { ytd: 0, open: 0, closedDays: [], avgDaysToClose: '—' }
-    })
-
-    allCaseDepts?.forEach(cd => {
-      const deptName = cd.departments?.name
-      if (!deptName || !deptSummary[deptName]) return
-      const c = allCases?.find(x => x.id === cd.case_id)
-      if (!c) return
-      if (new Date(c.date_submitted) >= startOfYear) deptSummary[deptName].ytd++
-      const isOpen = !c.statuses?.is_closing
-      if (isOpen) deptSummary[deptName].open++
-      if (!isOpen && c.date_submitted && c.closed_date) {
-        const days = Math.round((new Date(c.closed_date) - new Date(c.date_submitted)) / (1000 * 60 * 60 * 24))
-        deptSummary[deptName].closedDays.push(days)
-      }
-    })
-
-    Object.keys(deptSummary).forEach(dept => {
-      const days = deptSummary[dept].closedDays
-      if (days.length > 0) {
-        deptSummary[dept].avgDaysToClose = Math.round(days.reduce((a, b) => a + b, 0) / days.length) + ' days'
-      }
-    })
-
-    // Build open case detail rows — scoped to each department's OWN assignment being open
-    // (not just the case overall), and "needs attention" means neither a comment nor a
-    // status change, since a status change is real public-visible movement too.
-    const openCaseRows = []
-    allCaseDepts?.forEach(cd => {
-      if (cd.statuses?.is_closing) return
-      const deptName = cd.departments?.name
-      const c = allCases?.find(x => x.id === cd.case_id)
-      if (!c) return
-      const comments = commentsByCaseId[c.id] || []
-      const lastComment = comments.length > 0 ? new Date(comments[0].created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
-      const hasStatusChange = Boolean(cd.status_changed_at)
-      const daysOpen = daysSince(c.date_submitted)
-      openCaseRows.push({
-        case_number: c.case_number,
-        date_submitted: formatDate(c.date_submitted),
-        days_open: daysOpen,
-        department: deptName,
-        issue_type: c.issue_types?.name || '—',
-        location: c.location || '—',
-        description: (c.description || '').slice(0, 500),
-        last_comment: lastComment,
-        has_status_change: hasStatusChange,
-        no_comment: !lastComment && !hasStatusChange,
-      })
-    })
-
-    openCaseRows.sort((a, b) => b.days_open - a.days_open)
-
-    // Generate printable HTML report
-    const reportDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Department Accountability Report — ${reportDate}</title>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
-  @media print {
-    .no-print { display: none; }
-    body { margin: 0; }
-    .page-break { page-break-before: always; }
-  }
-  .header { background-color: #1a56a0; color: white; padding: 24px 32px; }
-  .header h1 { margin: 0 0 4px 0; font-size: 20px; }
-  .header p { margin: 0; font-size: 13px; opacity: 0.85; }
-  .body { padding: 24px 32px; }
-  .section-title { font-size: 14px; font-weight: 700; color: #1a56a0; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; margin: 24px 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 11px; }
-  th { background-color: #dbeafe; color: #1e40af; padding: 8px 10px; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; border: 1px solid #bfdbfe; }
-  td { padding: 7px 10px; border: 1px solid #e5e7eb; vertical-align: top; }
-  tr:nth-child(even) { background-color: #f9fafb; }
-  .red { color: #dc2626; font-weight: 700; }
-  .orange { color: #d97706; font-weight: 600; }
-  .green { color: #065f46; }
-  .badge-red { background-color: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 3px; font-weight: 700; font-size: 10px; }
-  .badge-orange { background-color: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 10px; }
-  .badge-green { background-color: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
-  .dept-section { margin-bottom: 32px; }
-  .dept-header { background-color: #1a56a0; color: white; padding: 8px 12px; font-weight: 700; font-size: 13px; margin-bottom: 0; }
-  .print-btn { background-color: #1a56a0; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; margin: 16px 32px; display: block; }
-  .footer { text-align: center; font-size: 10px; color: #9ca3af; padding: 16px; border-top: 1px solid #e5e7eb; margin-top: 24px; }
-</style>
-</head>
-<body>
-<button class="no-print print-btn" onclick="window.print()">🖨️ Print Report</button>
-<div class="header">
-  <h1>Department Accountability Report</h1>
-  <p>City of Franklin, New Hampshire &nbsp;|&nbsp; Generated: ${reportDate} &nbsp;|&nbsp; Confidential — City Manager Use</p>
-</div>
-<div class="body">
-
-<div class="section-title">Department Summary — Year to Date ${currentYear}</div>
-<table>
-  <thead>
-    <tr>
-      <th>Department</th>
-      <th>Total Cases YTD</th>
-      <th>Currently Open</th>
-      <th>Avg Days to Close</th>
-      <th>Open w/ No Status Change or Comment</th>
-      <th>Open 7+ Days, No Update</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${Object.entries(deptSummary).map(([dept, data]) => {
-      const acct = accountability.find(a => a.department === dept) || { no_comment: 0, over_7_days: 0 }
-      return `<tr>
-        <td><strong>${dept}</strong></td>
-        <td>${data.ytd}</td>
-        <td>${data.open}</td>
-        <td>${data.avgDaysToClose}</td>
-        <td>${acct.no_comment > 0 ? `<span class="badge-orange">${acct.no_comment}</span>` : '<span class="badge-green">0</span>'}</td>
-        <td>${acct.over_7_days > 0 ? `<span class="badge-red">${acct.over_7_days}</span>` : '<span class="badge-green">0</span>'}</td>
-      </tr>`
-    }).join('')}
-  </tbody>
-</table>
-
-<div class="section-title page-break">Open Case Detail by Department</div>
-${Object.keys(deptSummary).map(dept => {
-  const deptCases = openCaseRows.filter(r => r.department === dept)
-  if (deptCases.length === 0) return ''
-  return `
-  <div class="dept-section">
-    <div class="dept-header">${dept} — ${deptCases.length} Open Case${deptCases.length !== 1 ? 's' : ''}</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Case #</th>
-          <th>Submitted</th>
-          <th>Days Open</th>
-          <th>Issue Type</th>
-          <th>Location</th>
-          <th>Description</th>
-          <th>Last Update</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${deptCases.map(c => `<tr>
-          <td><strong>${c.case_number}</strong></td>
-          <td>${c.date_submitted}</td>
-          <td>${c.days_open >= 30 ? `<span class="badge-red">${c.days_open}d</span>` : c.days_open >= 7 ? `<span class="badge-orange">${c.days_open}d</span>` : `${c.days_open}d`}</td>
-          <td>${c.issue_type}</td>
-          <td>${(c.location || '—').slice(0, 100)}${c.location?.length > 100 ? '...' : ''}</td>
-          <td style="max-width:200px">${c.description}</td>
-          <td>${c.last_comment ? `<span class="badge-green">${c.last_comment}</span>` : c.has_status_change ? '<span class="badge-green">Status updated</span>' : '<span class="badge-red">No update</span>'}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-  </div>`
-}).join('')}
-
-</div>
-<div class="footer">City of Franklin, New Hampshire &nbsp;|&nbsp; Service Request System &nbsp;|&nbsp; Confidential — Internal Use Only</div>
-</body>
-</html>`
-
-    const blob = new Blob([html], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const win = window.open(url, '_blank')
-    if (win) win.focus()
-    setExportingReport(false)
-  }
-
   const filteredCases = cases.filter(c => {
     const isOpen = !c.statuses?.is_closing
     if (statusFilter === 'open' && !isOpen) return false
@@ -694,22 +457,6 @@ ${Object.keys(deptSummary).map(dept => {
           <div>
             <div style={styles.tableTitle}>📊 Department Accountability</div>
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Open cases · public comment status · cases silent for 7+ days</div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              style={styles.exportBtn}
-              onClick={handleExportTimeline}
-              disabled={exportingTimeline}
-            >
-              {exportingTimeline ? 'Generating...' : '📅 Export Case Timeline for Review'}
-            </button>
-            <button
-              style={styles.exportBtn}
-              onClick={handleExportReport}
-              disabled={exportingReport}
-            >
-              {exportingReport ? 'Generating...' : '📄 Export Report for City Manager'}
-            </button>
           </div>
         </div>
         {accountabilityLoading ? (
