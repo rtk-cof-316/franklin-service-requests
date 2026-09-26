@@ -556,29 +556,34 @@ function SubmitForm() {
       await supabase.from('details_91a').insert([{ case_id: newCase.id }])
     }
 
-    // Auto-assign to department based on issue type. Uses the edge function (service
+    // Auto-assign to department(s) based on issue type. Uses the edge function (service
     // role key) since RLS deliberately blocks the anon role from writing directly to
-    // case_departments/case_audit_log.
+    // case_departments/case_audit_log. Most issue types route to exactly one department
+    // (default_department_id); a few also route to additional ones (additional_department_ids)
+    // — each gets its own case_departments row and its own notification email.
     if (newCase && selectedIssueType?.default_department_id) {
-      try {
-        await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            type: 'auto_assign_department',
-            caseId: newCase.id,
-            departmentId: selectedIssueType.default_department_id,
-            issueTypeName: selectedIssueType.name,
-            caseNumber: newCaseNumber,
-            location: formData.location,
-            description: formData.description,
-          }),
-        })
-      } catch (deptEmailError) {
-        console.error('Department auto-assignment error:', deptEmailError)
+      const departmentIds = [selectedIssueType.default_department_id, ...(selectedIssueType.additional_department_ids || [])]
+      for (const departmentId of departmentIds) {
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              type: 'auto_assign_department',
+              caseId: newCase.id,
+              departmentId,
+              issueTypeName: selectedIssueType.name,
+              caseNumber: newCaseNumber,
+              location: formData.location,
+              description: formData.description,
+            }),
+          })
+        } catch (deptEmailError) {
+          console.error('Department auto-assignment error:', deptEmailError)
+        }
       }
     }
 
