@@ -268,7 +268,7 @@ function daysSince(dateStr) {
   return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
-function AdminDashboard({ onViewCase, refreshKey }) {
+function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
@@ -458,6 +458,12 @@ function AdminDashboard({ onViewCase, refreshKey }) {
             <div style={styles.tableTitle}>📊 Department Accountability</div>
             <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Open cases · public comment status · cases silent for 7+ days</div>
           </div>
+          <button
+            style={{ padding: '7px 16px', backgroundColor: '#991b1b', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            onClick={onPrintEscalatedReport}
+          >
+            🚨 Escalated Cases Report
+          </button>
         </div>
         {accountabilityLoading ? (
           <div style={styles.loading}>Loading...</div>

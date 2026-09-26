@@ -9,6 +9,7 @@ import CaseDetail from './CaseDetail'
 import DepartmentDashboard from './DepartmentDashboard'
 import PrintWorkOrder from './PrintWorkOrder'
 import PrintCaseDetail from './PrintCaseDetail'
+import PrintEscalatedCasesReport from './PrintEscalatedCasesReport'
 import PrintMultipleWorkOrders from './PrintMultipleWorkOrders'
 import RoadWatch from './RoadWatch'
 import PublicAnalytics from './PublicAnalytics'
@@ -221,7 +222,7 @@ function App() {
 
   const isCarAdmin = !!carAdminRole(session?.user?.email)
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet', 'print-car-submission'].includes(page)
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet', 'print-car-submission', 'print-escalated-report'].includes(page)
 
   const navBtn = (target, label) => (
     <button
@@ -373,7 +374,10 @@ function App() {
       )}
       {page === 'login' && !session && <Login />}
       {page === 'admin' && session && userRole === 'admin' && (
-        <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} />
+        <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} onPrintEscalatedReport={() => setPage('print-escalated-report')} />
+      )}
+      {page === 'print-escalated-report' && session && userRole === 'admin' && (
+        <PrintEscalatedCasesReport onClose={() => setPage('admin')} />
       )}
       {page === 'admin-department-view' && session && userRole === 'admin' && (
         <AdminDepartmentView onViewCase={handleViewCase} refreshKey={refreshKey} onBulkPrint={handleBulkPrint} />
