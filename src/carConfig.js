@@ -2,6 +2,12 @@
 // Mirrors src/mouConfig.js's shape. Unlike MOU, access here is enforced at the RLS layer
 // too (is_car_admin() checks these same two emails directly) — this map only drives which
 // UI a logged-in admin sees, matching the DB-level rule rather than substituting for it.
+
+// Module retired 2026-09-26 — set back to true to restore every CAR nav button/page in
+// App.jsx. All CAR code, database tables, and existing submissions/cycles are untouched;
+// this is the single switch that hides the module from every entry point.
+export const CAR_MODULE_ENABLED = false
+
 export const CAR_ADMINS = {
   brenda: { email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' },
   cityManager: { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' },

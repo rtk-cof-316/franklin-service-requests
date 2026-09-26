@@ -1,3 +1,5 @@
+import { CAR_MODULE_ENABLED } from './carConfig'
+
 const s = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '48px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
   wrap: { maxWidth: '1000px', margin: '0 auto' },
@@ -21,7 +23,7 @@ const MODULES = [
   { page: 'mou-status', icon: '📋', title: 'Check MOU Status', desc: 'Check the status of an MOU proposal using your submission number and PIN.' },
   { page: 'car-submit', icon: '🏛️', title: 'Submit a CAR', desc: 'Request that an item be placed on a City Council agenda.' },
   { page: 'car-status', icon: '📄', title: 'Check CAR Status', desc: 'Check the status of a Council Action Report using your submission number and PIN.' },
-]
+].filter(m => CAR_MODULE_ENABLED || !m.page.startsWith('car-'))
 
 function Landing({ onNavigate }) {
   return (

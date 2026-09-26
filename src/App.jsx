@@ -26,7 +26,7 @@ import AdminMouSubmissions from './AdminMouSubmissions'
 import MouSubmissionDetail from './MouSubmissionDetail'
 import AdminMouTemplates from './AdminMouTemplates'
 import PrintMouAgreement from './PrintMouAgreement'
-import { carAdminRole } from './carConfig'
+import { carAdminRole, CAR_MODULE_ENABLED } from './carConfig'
 import CarSubmit from './CarSubmit'
 import CarStatus from './CarStatus'
 import AdminCarSubmissions from './AdminCarSubmissions'
@@ -220,7 +220,7 @@ function App() {
     setPage('print-car-submission')
   }
 
-  const isCarAdmin = !!carAdminRole(session?.user?.email)
+  const isCarAdmin = CAR_MODULE_ENABLED && !!carAdminRole(session?.user?.email)
 
   const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet', 'print-car-submission', 'print-escalated-report'].includes(page)
 
@@ -260,8 +260,8 @@ function App() {
           {navBtn('public-input', 'Public Comment')}
           {navBtn('mou-submit', 'Submit an MOU')}
           {navBtn('mou-status', 'Check MOU Status')}
-          {navBtn('car-submit', 'Submit a CAR')}
-          {navBtn('car-status', 'Check CAR Status')}
+          {CAR_MODULE_ENABLED && navBtn('car-submit', 'Submit a CAR')}
+          {CAR_MODULE_ENABLED && navBtn('car-status', 'Check CAR Status')}
           <div style={{ marginLeft: 'auto' }}>
             {session ? (
               <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
@@ -331,8 +331,8 @@ function App() {
       {page === 'print-mou-agreement' && session && viewingMouSubmissionId && (
         <PrintMouAgreement submissionId={viewingMouSubmissionId} onClose={() => setPage('mou-detail')} />
       )}
-      {page === 'car-submit' && <CarSubmit />}
-      {page === 'car-status' && <CarStatus />}
+      {page === 'car-submit' && CAR_MODULE_ENABLED && <CarSubmit />}
+      {page === 'car-status' && CAR_MODULE_ENABLED && <CarStatus />}
       {page === 'admin-car' && session && isCarAdmin && (
         <AdminCarSubmissions onViewSubmission={handleViewCarSubmission} onManageCycles={() => setPage('admin-car-cycles')} onCreateCar={() => setPage('admin-car-create')} />
       )}
