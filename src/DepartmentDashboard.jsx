@@ -358,6 +358,10 @@ function daysSince(dateStr) {
   return Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
 }
 
+function latestDate(...dates) {
+  return dates.filter(Boolean).sort().pop() || null
+}
+
 function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint, isAdminView = false }) {
   const [cases, setCases] = useState([])
   const [departmentName, setDepartmentName] = useState('')
@@ -424,11 +428,9 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
     const caseIds = Object.keys(bestRowByCase).map(Number)
     const deptStatusMap = {}
     const deptStatusClosingMap = {}
-    const deptStatusChangedMap = {}
     for (const [caseId, cd] of Object.entries(bestRowByCase)) {
       deptStatusMap[caseId] = cd.statuses?.name || null
       deptStatusClosingMap[caseId] = Boolean(cd.statuses?.is_closing)
-      deptStatusChangedMap[caseId] = Boolean(cd.status_changed_at)
     }
 
     const { data, error } = await supabase
@@ -442,14 +444,14 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
         ...c,
         dept_status: deptStatusMap[c.id] || null,
         dept_status_is_closing: deptStatusClosingMap[c.id] || false,
-        dept_status_has_changed: deptStatusChangedMap[c.id] || false,
       }))
       setCases(enriched)
 
-      // Calculate urgent cases — open, with no status change AND no public comment for
-      // 7+ days. A status change is real, public-visible movement just like a comment is
-      // (both show up to the requester) — a department that's been actively moving a case
-      // through statuses shouldn't be flagged just because they haven't also left a comment.
+      // Calculate urgent cases — open, and with no status change or public comment in the
+      // last 7+ days (based on the most recent of the two, whichever is later — a status
+      // change is real, public-visible movement just like a comment is). This has to be
+      // based on recency, not "has this ever happened at all" — a case a department touched
+      // once, months ago, and hasn't touched since must still show up as needing attention.
       const openCaseIds = enriched
         .filter(c => !c.dept_status_is_closing)
         .map(c => c.id)
@@ -457,15 +459,25 @@ function DepartmentDashboard({ departmentId, onViewCase, refreshKey, onBulkPrint
       if (openCaseIds.length > 0) {
         const { data: comments } = await supabase
           .from('case_comments')
-          .select('case_id')
+          .select('case_id, created_at')
           .in('case_id', openCaseIds)
 
-        const casesWithComments = new Set(comments?.map(c => c.case_id) || [])
+        // Latest comment date per case, not just whether one was EVER posted — a case
+        // commented on once, months ago, and silent ever since must still count. Checking
+        // existence alone (the previous bug here, mirrored in AdminDashboard.jsx) meant a
+        // single old comment or status change satisfied "has movement" forever, so a case
+        // could go quiet for months after that and never be flagged again.
+        const lastCommentAtByCase = {}
+        for (const c of comments || []) {
+          lastCommentAtByCase[c.case_id] = latestDate(lastCommentAtByCase[c.case_id], c.created_at)
+        }
+
         const urgentCases = enriched.filter(c => {
           const isOpen = !c.dept_status_is_closing
-          const hasMovement = casesWithComments.has(c.id) || c.dept_status_has_changed
-          const daysOpen = daysSince(c.date_submitted)
-          return isOpen && !hasMovement && daysOpen >= 7
+          const cd = bestRowByCase[c.id]
+          const lastActivityAt = latestDate(cd?.status_changed_at, lastCommentAtByCase[c.id], cd?.created_at, c.date_submitted)
+          const daysSilent = daysSince(lastActivityAt)
+          return isOpen && daysSilent >= 7
         })
         setUrgentCount(urgentCases.length)
         setUrgentCaseIds(new Set(urgentCases.map(c => c.id)))

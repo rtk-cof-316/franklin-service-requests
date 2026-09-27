@@ -223,8 +223,8 @@ This spans four places that must agree on the same two rules, and have historica
 | Where | File | What it does |
 |---|---|---|
 | Daily reminder/escalation email | `supabase/functions/daily-case-check/index.ts` | 3-day silence digest email per department; 2-week escalation email to both the department and the City Manager's Office |
-| Admin quick view | `src/AdminDashboard.jsx` — "📊 Department Accountability" table | Per-department tally of rows with no comment/status change |
-| Department banner | `src/DepartmentDashboard.jsx` — "⚠️ Needs Update" filter | Flags a department's own cases that need attention |
+| Admin quick view | `src/AdminDashboard.jsx` — "📊 Department Accountability" table | Per-department tally of rows with no *recent* comment/status change (see §5.4) |
+| Department banner | `src/DepartmentDashboard.jsx` — "⚠️ Needs Update" filter | Flags a department's own cases silent 7+ days since their last real movement (see §5.4) |
 | Printable report | `src/PrintEscalatedCasesReport.jsx` — "🚨 Escalated Cases Report" | Full narrative of every currently-escalated case, grouped by department, for the City Manager |
 
 ### 5.1 The follow-up-date exception
@@ -243,6 +243,14 @@ This is a known, intentional inconsistency, not yet reconciled — see [MAINTENA
 ### 5.3 Audit-log text is load-bearing
 
 Both `PrintEscalatedCasesReport.jsx` (`findStatusChangeAuditEntry`) and `department-performance/index.ts` (`ASSIGNED_TO_RE`, `AUTO_ASSIGNED_RE`, `REFERRED_TO_RE`, `DEPT_STATUS_RE`) parse `case_audit_log.action` with regexes matched against the *exact* phrasing `CaseDetail.jsx`/`SubmitForm.jsx`/`send-confirmation-email` currently write (e.g. `"<Dept> status changed from "X" to "Y""` for self-service edits vs. `"<Dept> status updated from "X" to "Y" by admin"` for an admin's per-row edit). **Changing any of that wording without updating these regexes will silently break reporting and performance stats** — there's no test suite that would catch it.
+
+### 5.4 Fixed 2026-09-26: "has this ever happened" vs. "has this happened recently"
+
+`AdminDashboard.jsx`'s "Silent 7+ Days" column and `DepartmentDashboard.jsx`'s "⚠️ Needs Update" filter both used to check whether a comment or status change had **ever** occurred on a row (`Boolean(cd.status_changed_at)`, and a plain existence check for comments), rather than **when** the most recent one happened. Since `status_changed_at` is set the first time a row's status is ever recorded and a comment-existence check has no expiry, a single touch — even a status change or comment from months earlier — permanently satisfied "has movement" for that row and hid it from both features forever afterward, no matter how stale it got. A real case was found silent for 52 days (last comment 8/5, checked 9/26) while still showing as fine on both screens.
+
+Both were fixed to compute a genuine `lastActivityAt = latestDate(status_changed_at, mostRecentCommentDate, created_at)` and check `daysSince(lastActivityAt) >= 7`, matching the same recency-based pattern `daily-case-check` and `PrintEscalatedCasesReport.jsx` already used correctly (see §5.2's `escalated_at >= lastMovementAt` for the same idea applied to escalation). `AdminDashboard.jsx`'s separate "No Status Change or Comment" column was left as a boolean "never touched at all since assignment" check — a legitimately different, narrower signal from "currently stale" — but "Silent 7+ Days" is no longer nested inside it, so a row that *had* activity once and has since gone quiet is no longer invisible to the 7-day check.
+
+**If you add a third "is this case silent" check anywhere else in this app, make it recency-based (`daysSince(lastActivityAt) >= N`) from the start** — the existence-check version of this bug is easy to introduce by accident and easy to miss in review, since it looks correct and works fine until enough time passes.
 
 ## 6. RSA 91-A (Right-to-Know) workflow and tax-dollar calculation
 

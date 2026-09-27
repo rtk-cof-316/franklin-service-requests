@@ -268,6 +268,10 @@ function daysSince(dateStr) {
   return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
+function latestDate(...dates) {
+  return dates.filter(Boolean).sort().pop() || null
+}
+
 function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -332,7 +336,7 @@ function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
     // counted just because the case as a whole is still open under some other department.
     const { data: caseDepts } = await supabase
       .from('case_departments')
-      .select('case_id, department_id, status_changed_at, departments ( name ), statuses ( name, is_closing )')
+      .select('case_id, department_id, created_at, status_changed_at, departments ( name ), statuses ( name, is_closing )')
 
     const { data: allCases } = await supabase
       .from('cases')
@@ -340,7 +344,7 @@ function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
 
     const { data: allComments } = await supabase
       .from('case_comments')
-      .select('case_id, department_id')
+      .select('case_id, department_id, created_at')
 
     if (!caseDepts || !allCases) {
       setAccountabilityLoading(false)
@@ -350,14 +354,19 @@ function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
     const dateSubmittedByCaseId = {}
     allCases.forEach(c => { dateSubmittedByCaseId[c.id] = c.date_submitted })
 
-    const hasCommentByCaseAndDept = new Set(
-      (allComments || []).map(c => `${c.case_id}:${c.department_id}`)
-    )
+    // Latest comment date per (case, department) — not just whether one was EVER posted.
+    // A department that commented once, months ago, and has been silent ever since must
+    // still show up as silent; checking existence alone (the previous bug here) meant a
+    // single old comment or status change satisfied this check forever.
+    const lastCommentAtByCaseAndDept = {}
+    for (const c of allComments || []) {
+      const key = `${c.case_id}:${c.department_id}`
+      lastCommentAtByCaseAndDept[key] = latestDate(lastCommentAtByCaseAndDept[key], c.created_at)
+    }
 
     const deptMap = {}
     caseDepts.forEach(cd => {
-      // A status change is real, public-visible movement just like a comment is — only
-      // count against a department if it's shown NEITHER since being assigned. Once a
+      // A status change is real, public-visible movement just like a comment is. Once a
       // department's own row is closed (done/referred out), it's no longer theirs to track.
       if (cd.statuses?.is_closing) return
       const deptName = cd.departments?.name
@@ -366,13 +375,20 @@ function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
         deptMap[deptName] = { department: deptName, open_cases: 0, no_comment: 0, over_7_days: 0 }
       }
       deptMap[deptName].open_cases++
-      const hasComment = hasCommentByCaseAndDept.has(`${cd.case_id}:${cd.department_id}`)
+      const lastCommentAt = lastCommentAtByCaseAndDept[`${cd.case_id}:${cd.department_id}`] || null
+      const hasComment = Boolean(lastCommentAt)
       const hasStatusChange = Boolean(cd.status_changed_at)
       if (!hasComment && !hasStatusChange) {
         deptMap[deptName].no_comment++
-        const daysOpen = daysSince(dateSubmittedByCaseId[cd.case_id])
-        if (daysOpen >= 7) deptMap[deptName].over_7_days++
       }
+      // Independent of the "never touched at all" check above — a case that WAS commented
+      // on or had a status change, then went quiet, must still count once enough time has
+      // passed since that last real movement (this used to be nested inside the block
+      // above, so a case that had ever been touched even once could never be flagged again
+      // no matter how long it had been silent since).
+      const lastActivityAt = latestDate(cd.status_changed_at, lastCommentAt, cd.created_at, dateSubmittedByCaseId[cd.case_id])
+      const daysSilent = daysSince(lastActivityAt)
+      if (daysSilent !== null && daysSilent >= 7) deptMap[deptName].over_7_days++
     })
 
     const sorted = Object.values(deptMap).sort((a, b) => b.over_7_days - a.over_7_days)
