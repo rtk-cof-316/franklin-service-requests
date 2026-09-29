@@ -2,6 +2,14 @@
 // supabase/functions/_shared/mouConfig.ts. Brenda and Mitch already have separate admin
 // logins, so this map (keyed by their login email) is what gates which stage-actions a
 // logged-in admin sees. Keep both files in sync if either address ever changes.
+
+// Module retired 2026-09-29 — no longer in use (the one real in-progress submission,
+// MOU-2026-1, was confirmed dead rather than something to follow up on). Set back to
+// true to restore every MOU nav button/page in App.jsx. All MOU code, database tables,
+// and existing submissions are untouched; this is the single switch that hides the
+// module from every entry point.
+export const MOU_MODULE_ENABLED = false
+
 export const MOU_REVIEWERS = {
   brenda: { email: 'bdemers@franklinnh.gov', name: 'Brenda Demers' },
   cityManager: { email: 'citymgr@franklinnh.gov', name: 'Mitch Kloewer' },

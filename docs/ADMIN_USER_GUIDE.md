@@ -16,7 +16,7 @@ This guide is written for the person running the Franklin Service Request System
 10. [Reports](#10-reports)
 11. [The escalation process — when a department goes quiet](#11-the-escalation-process--when-a-department-goes-quiet)
 12. [Public Comment](#12-public-comment)
-13. [MOUs](#13-mous)
+13. [MOUs — retired](#13-mous-retired)
 14. [CARs (Council Agenda Reports) — retired](#14-cars-council-agenda-reports-retired)
 15. [Adding or removing a staff login](#15-adding-or-removing-a-staff-login)
 
@@ -26,9 +26,9 @@ This guide is written for the person running the Franklin Service Request System
 
 Click **Staff Login** in the top-right corner of any public page. Enter your email and password and sign in. There is no "create account" option on this page — every staff login has to be set up ahead of time (see [§15](#15-adding-or-removing-a-staff-login)).
 
-Once you're logged in, a second row of buttons appears under the main navigation — this is your "Staff Tools" row. As the admin, you'll see: **Admin**, **Departments**, **Public Comments**, **MOUs**.
+Once you're logged in, a second row of buttons appears under the main navigation — this is your "Staff Tools" row. As the admin, you'll see: **Admin**, **Departments**, **Public Comments**.
 
-> **Note:** a **CARs** button used to appear here for Council Agenda Report management. That module was retired on 2026-09-26 — see [§14](#14-cars-council-agenda-reports-retired) — so the button, the public "Submit a CAR"/"Check CAR Status" links, and the homepage cards for it are all gone from the live site now.
+> **Note:** an **MOUs** button and a **CARs** button used to appear here. Both modules have since been retired (MOU on 2026-09-29, CAR on 2026-09-26 — see [§13](#13-mous-retired) and [§14](#14-cars-council-agenda-reports-retired)), so those buttons, their public submit/status links, and their homepage cards are all gone from the live site now.
 
 **You'll be automatically signed out after 10 minutes of no activity** (no mouse movement, clicks, scrolling, or typing). This is intentional and not a bug — if it happens mid-task, just log back in.
 
@@ -41,7 +41,6 @@ To sign out on purpose, click **Log Out** in the top-right corner.
 | **Admin** | The Admin Dashboard — every case, city-wide (§7) |
 | **Departments** | A picker to view any single department's own dashboard, read-only (§8) |
 | **Public Comments** | Manage topics and moderate comments (§12) |
-| **MOUs** | Review Memoranda of Understanding from outside organizations (§13) |
 
 ## 3. How a case enters the system
 
@@ -148,19 +147,9 @@ Click **Public Comments**. Two tabs: **Topics** and **Moderation**.
 
 **Moderation tab** — a single queue of every pending comment across all topics (filter by topic with the dropdown at top), oldest first. Each card shows the commenter's name/ward, the topic and position they picked, their comment, and — if they flagged one — their questions and concern themes (shown for your context only; you can't edit these). Click **Approve** or **Reject**. There's no bulk action — it's one at a time, by design. Only approved comments (and their questions/themes) ever become visible to the public anywhere.
 
-## 13. MOUs
+## 13. MOUs — retired
 
-Click **MOUs** to see the review queue. Opening a submission shows its current stage and whatever review actions apply to that stage:
-
-- At **Manager Review (Brenda)**: **Send Back — Missing Information**, **Send Back — Submitter Needs to Review/Approve**, or **Push to City Manager**.
-- At **Manager Review (City Manager)**: the same two send-backs, plus **Send Back to Brenda** or **Mark Ready for Council**.
-- At **Ready for Council**: **Save Council Date**, then **Approved** or **Denied** (or **Send Back to City Manager Review**).
-
-Every "send back" emails the organization automatically with your note, and routes their next resubmission back to whichever one of you sent it back. The organization only ever sees a collapsed **"Manager Review"** step on their end — they're never told whether it's specifically with you or the City Manager.
-
-A **Reset PIN** button is available if an organization loses theirs — **always relay a new PIN by phone, never by email**, since PINs are never stored anywhere in a form that could be read back and emailed.
-
-**MOUs → (template management)** lets you edit the standard agreement wording and its fill-in fields, and save changes as a new version — this never changes an organization's submission that's already in progress; they stay on whichever version they started with. There is no Word/PDF export for the final agreement, only **🖨️ Print / Save as PDF** on the agreement page itself, which includes a note that it isn't the legally final document until Council has acted.
+**This module was retired on 2026-09-29** (no longer in use) and is no longer reachable anywhere in the live app — no **MOUs** button, no public "Submit an MOU"/"Check MOU Status" links, no homepage cards for it. If it's ever needed again, that's a one-line code change for your developer (flip `MOU_MODULE_ENABLED` back to `true` in `src/mouConfig.js`) — nothing was deleted, including the one real submission already in the system (from Community Action Partnership Belknap-Merrimack Counties' Head Start Program, which was sitting at "Manager Review" awaiting missing information when the module was retired). The description that used to live in this section — the review stages, PIN-based org access, the template builder — is preserved in [ARCHITECTURE.md §8](ARCHITECTURE.md#8-mou-module-retired) in case the module is ever turned back on.
 
 ## 14. CARs (Council Agenda Reports) — retired
 

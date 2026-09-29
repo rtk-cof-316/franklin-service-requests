@@ -11,7 +11,7 @@ Technical reference for maintaining this codebase. It documents the app as it ac
 5. [The "accountability system" (reminders, escalation, silence tracking)](#5-the-accountability-system-reminders-escalation-silence-tracking)
 6. [RSA 91-A (Right-to-Know) workflow and tax-dollar calculation](#6-rsa-91-a-right-to-know-workflow-and-tax-dollar-calculation)
 7. [Public Comment module](#7-public-comment-module)
-8. [MOU module](#8-mou-module)
+8. [MOU module — retired](#8-mou-module-retired)
 9. [CAR (Council Agenda Report) module — retired](#9-car-council-agenda-report-module-retired)
 10. [Road Watch / Road Vote](#10-road-watch--road-vote)
 11. [Email system](#11-email-system)
@@ -32,7 +32,7 @@ There are five largely independent workflows sharing one codebase and one Supaba
 | Core case tracking | Submit a Request / Check Status / Road Watch | My Cases (department) / Admin Dashboard (admin) |
 | RSA 91-A | (a checkbox inside the core intake form) | The 91-A cards inside a case's detail page (admin only) |
 | Public Comment | Public Comment | Public Comments (admin) |
-| MOU | Submit an MOU / Check MOU Status | MOUs (admin) |
+| MOU *(retired 2026-09-29)* | ~~Submit an MOU / Check MOU Status~~ | ~~MOUs (admin)~~ |
 | CAR *(retired 2026-09-26)* | ~~Submit a CAR / Check CAR Status~~ | ~~CARs (gated separately — see §12)~~ |
 
 All five talk to the same Supabase Postgres database via the same anon key from the browser, with row-level security (RLS) policies doing the real access control, plus a handful of Supabase Edge Functions that run with the service-role key for anything that needs to bypass RLS (cross-department reads, PIN hashing, sending email).
@@ -314,7 +314,9 @@ Admin creates a topic (`AdminTopics.jsx`, "Topics" tab) with a title, descriptio
 
 `PublicAnalytics.jsx` (nav label "City Analytics") is a **separate transparency dashboard** built entirely from `cases`/`case_departments`/`details_91a`/`issue_types` — despite the similar name, it has zero connection to `topics`/`comments`. The actual analysis for a Public Comment topic (position breakdown, concern themes) is rendered inline inside `PublicInputTopic.jsx` and `PrintPublicInputTopic.jsx`, not in a dedicated analytics file.
 
-## 8. MOU module
+## 8. MOU module — retired
+
+**Retired from the live app on 2026-09-29** (no longer in use, per Brenda — including one real, unfinished submission that was confirmed dead rather than followed up on). Everything below still describes how the module works internally — nothing was deleted — but it is no longer reachable from anywhere in the running app. A single flag, `MOU_MODULE_ENABLED` in `src/mouConfig.js`, is set to `false`; every MOU nav button (public "Submit an MOU"/"Check MOU Status," the homepage cards in `Landing.jsx`, and the admin "MOUs" button) and all 6 MOU `page` values in `App.jsx` (`mou-submit`, `mou-status`, `admin-mou-submissions`, `admin-mou-templates`, `mou-detail`, `print-mou-agreement`) are gated behind it directly. Flipping `MOU_MODULE_ENABLED` back to `true` restores every entry point immediately, with no data migration needed — the database tables (`mou_templates`, `mou_template_sections`, `mou_submissions`, `mou_submission_field_values`, `mou_submission_section_text`, `mou_review_comments`, `mou_supporting_documents`, `mou_activity_log`), the MOU-specific enums, and the `mou-submit`/`mou-org-action` Edge Functions were all left exactly as they were — including the one real submission, `MOU-2026-1` (Community Action Partnership Belknap-Merrimack Counties Head Start Program), which was sitting at `missing_information` when the module was retired.
 
 ### 8.1 Templates
 

@@ -20,6 +20,7 @@ import PublicInputSubmit from './PublicInputSubmit'
 import AdminTopics from './AdminTopics'
 import AdminModeration from './AdminModeration'
 import AdminDepartmentView from './AdminDepartmentView'
+import { MOU_MODULE_ENABLED } from './mouConfig'
 import MouSubmit from './MouSubmit'
 import MouStatus from './MouStatus'
 import AdminMouSubmissions from './AdminMouSubmissions'
@@ -258,8 +259,8 @@ function App() {
           {navBtn('roads', 'Road Watch')}
           {navBtn('analytics', 'City Analytics')}
           {navBtn('public-input', 'Public Comment')}
-          {navBtn('mou-submit', 'Submit an MOU')}
-          {navBtn('mou-status', 'Check MOU Status')}
+          {MOU_MODULE_ENABLED && navBtn('mou-submit', 'Submit an MOU')}
+          {MOU_MODULE_ENABLED && navBtn('mou-status', 'Check MOU Status')}
           {CAR_MODULE_ENABLED && navBtn('car-submit', 'Submit a CAR')}
           {CAR_MODULE_ENABLED && navBtn('car-status', 'Check CAR Status')}
           <div style={{ marginLeft: 'auto' }}>
@@ -282,7 +283,7 @@ function App() {
           {userRole === 'admin' && navBtn('admin', 'Admin')}
           {userRole === 'admin' && navBtn('admin-department-view', 'Departments')}
           {userRole === 'admin' && navBtn('admin-public-topics', 'Public Comments')}
-          {userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
+          {MOU_MODULE_ENABLED && userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
           {isCarAdmin && navBtn('admin-car', 'CARs')}
           {userRole === 'department' && navBtn('department', 'My Cases')}
         </div>
@@ -314,13 +315,13 @@ function App() {
           onSubmitted={() => setPage('public-input-detail')}
         />
       )}
-      {page === 'mou-submit' && <MouSubmit />}
-      {page === 'mou-status' && <MouStatus />}
-      {page === 'admin-mou-submissions' && session && userRole === 'admin' && (
+      {page === 'mou-submit' && MOU_MODULE_ENABLED && <MouSubmit />}
+      {page === 'mou-status' && MOU_MODULE_ENABLED && <MouStatus />}
+      {page === 'admin-mou-submissions' && MOU_MODULE_ENABLED && session && userRole === 'admin' && (
         <AdminMouSubmissions onViewSubmission={handleViewMouSubmission} onEditTemplate={() => setPage('admin-mou-templates')} />
       )}
-      {page === 'admin-mou-templates' && session && userRole === 'admin' && <AdminMouTemplates />}
-      {page === 'mou-detail' && session && viewingMouSubmissionId && (
+      {page === 'admin-mou-templates' && MOU_MODULE_ENABLED && session && userRole === 'admin' && <AdminMouTemplates />}
+      {page === 'mou-detail' && MOU_MODULE_ENABLED && session && viewingMouSubmissionId && (
         <MouSubmissionDetail
           submissionId={viewingMouSubmissionId}
           userEmail={session.user.email}
@@ -328,7 +329,7 @@ function App() {
           onPrint={handlePrintMouAgreement}
         />
       )}
-      {page === 'print-mou-agreement' && session && viewingMouSubmissionId && (
+      {page === 'print-mou-agreement' && MOU_MODULE_ENABLED && session && viewingMouSubmissionId && (
         <PrintMouAgreement submissionId={viewingMouSubmissionId} onClose={() => setPage('mou-detail')} />
       )}
       {page === 'car-submit' && CAR_MODULE_ENABLED && <CarSubmit />}

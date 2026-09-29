@@ -1,6 +1,6 @@
 # Franklin Service Request System
 
-A web application for the City of Franklin, New Hampshire that lets residents report problems (potholes, code violations, trash complaints, Right-to-Know/RSA 91-A records requests, and more) and lets city staff track, route, and resolve them. It also runs three related civic workflows: a **Public Comment** module for structured resident input ahead of City Council hearings, an **MOU** module for reviewing Memoranda of Understanding with outside organizations, and a **CAR (Council Agenda Report)** module for building City Council meeting agendas/packets.
+A web application for the City of Franklin, New Hampshire that lets residents report problems (potholes, code violations, trash complaints, Right-to-Know/RSA 91-A records requests, and more) and lets city staff track, route, and resolve them. It also runs a **Public Comment** module for structured resident input ahead of City Council hearings. Two other workflows (**MOU** and **CAR**) exist in the codebase but are currently retired — see below.
 
 Live site: **https://franklin-service-requests-39a5.vercel.app**
 
@@ -11,9 +11,10 @@ For the full technical writeup (schema, module internals, routing logic), see [A
 - **Residents (the public)** — no login. Submit a request, check the status of one they already made, browse a live map of road issues and vote on repair priorities, view city-wide statistics, or weigh in on an open Public Comment topic.
 - **Department staff** — log in to see and work only the cases assigned to their own department (MSD, Fire/Code, PZ, Assessing, Police/Prosecutor, Finance, Human Resources, Legal, Parks & Rec, IT, or City Manager).
 - **Admin (the City Manager's Office)** — sees every case city-wide, manages department routing, moderates Public Comment, and reviews escalated cases. Currently one person, Brenda Demers.
-- **Outside organizations** — no login; use a PIN-protected submission number to submit and track an MOU with the City.
 
-> **CAR (Council Agenda Report) module — retired 2026-09-26.** The app also contains a fifth workflow for building City Council meeting agendas from department heads' reports. It's been hidden from every entry point (public nav, the homepage, and the CAR-admin nav button) via a single flag, but the code, database tables, and the one real historical submission/meeting cycle are all untouched — see [ARCHITECTURE.md §9](ARCHITECTURE.md#9-car-council-agenda-report-module-retired) for how to bring it back if it's ever needed again.
+> **CAR (Council Agenda Report) module — retired 2026-09-26.** A workflow for building City Council meeting agendas from department heads' reports. Hidden from every entry point via a single flag; code, database tables, and the one real historical submission/meeting cycle are all untouched — see [ARCHITECTURE.md §9](ARCHITECTURE.md#9-car-council-agenda-report-module-retired).
+>
+> **MOU module — retired 2026-09-29.** A workflow for outside organizations to submit and the City to review Memoranda of Understanding. No longer in use; hidden the same way — see [ARCHITECTURE.md §8](ARCHITECTURE.md#8-mou-module-retired).
 
 ## Tech stack
 
@@ -22,7 +23,7 @@ For the full technical writeup (schema, module internals, routing logic), see [A
 | [React 19](https://react.dev/) + [Vite 8](https://vitejs.dev/) | The frontend — one single-page app, no router library (page navigation is a plain `page` string in React state, optionally seeded from a `?page=` URL query param) |
 | [Supabase](https://supabase.com/) | Postgres database, authentication, file storage, and server-side logic ("Edge Functions", written in Deno/TypeScript) |
 | [Vercel](https://vercel.com/) | Hosts the built site and runs the one daily scheduled job (Vercel Cron) |
-| [Brevo](https://www.brevo.com/) | Sends every transactional email (confirmations, referral notices, reminders, escalations, MOU/CAR notifications) |
+| [Brevo](https://www.brevo.com/) | Sends every transactional email (confirmations, referral notices, reminders, escalations) |
 | [docx](https://www.npmjs.com/package/docx) | Generates the one true `.docx` export in the app (a CAR submission's Word copy) — everything else that looks like a PDF export is actually the browser's native "Print to PDF," not a real PDF library |
 | [Leaflet](https://leafletjs.com/) / react-leaflet | The map on the public Road Watch page |
 

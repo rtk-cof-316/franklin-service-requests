@@ -26,6 +26,12 @@ The Council Agenda Report module is hidden, not removed. `src/carConfig.js` expo
 
 If the module is ever fully deleted instead of just hidden, export `car_submissions`/`meeting_cycles`/`car_activity_log`/`car_reassignment_history` first — that one existing report is real City Council business, not test data, and there's no other copy of it inside this app.
 
+## The MOU module is retired (2026-09-29)
+
+Same pattern as CAR, above — hidden, not removed, because it's no longer in use. `src/mouConfig.js` exports `MOU_MODULE_ENABLED = false`, which `App.jsx` (and `Landing.jsx`'s homepage cards) gate every MOU nav button and `page` value behind directly. To bring it back: set `MOU_MODULE_ENABLED = true` and redeploy — no migration, no data restore, nothing else to touch. The database tables, the two Edge Functions (`mou-submit`, `mou-org-action`), and the one real submission already in the system (`MOU-2026-1`, Community Action Partnership Belknap-Merrimack Counties' Head Start Program, sitting at `missing_information` — confirmed dead, not something to follow up on) are all untouched.
+
+If the module is ever fully deleted instead of just hidden, export `mou_submissions`/`mou_submission_field_values`/`mou_activity_log` first regardless — even a dead proposal is a record of a real interaction with an outside organization.
+
 ## Known issues / technical debt
 
 These are real, currently-live inconsistencies — not bugs severe enough to have blocked shipping other work, but worth knowing about before you touch anything nearby:
