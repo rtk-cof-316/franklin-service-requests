@@ -470,7 +470,7 @@ An **internal-only** intake and repair log for problems with City-owned building
 
 | Who | Access |
 |---|---|
-| Anyone (no login), via the unlisted form | Submit one report (and up to 3 photos) through the `jlc-submit` Edge Function. **Cannot read, list, count, or update anything**; the `anon` role has no privileges on any of these tables, the storage bucket, or the helper RPCs (verified against the live REST API). |
+| Anyone (no login), via the form (unlisted, but linked discreetly from the Staff Login screen) | Submit one report (and up to 3 photos) through the `jlc-submit` Edge Function. **Cannot read, list, count, or update anything**; the `anon` role has no privileges on any of these tables, the storage bucket, or the helper RPCs (verified against the live REST API). |
 | `user_profiles.role = 'admin'`, or a `department` login whose department is **MSD** or **City Manager** | See the **JLC Facility Repairs** tab: read everything, log repairs, mark Completed, manage buildings, print. Decided by `public.is_jlc_user()`. |
 | Admins only (`is_jlc_admin()`) | Additionally edit the *original* report details after submission (every change is logged). |
 | Any other login (Fire/Code, PZ, etc.) or a login with no profile | Nothing — RLS returns zero rows and the tab is hidden. |
@@ -520,7 +520,7 @@ The tab's name lives in one constant, `JLC_TAB_LABEL` in `src/jlcConfig.js`.
 
 ### 15.6 The unlisted form
 
-`?page=jlc-report` renders `JlcReportForm.jsx` with the site nav hidden. It is not linked from the landing page, nav, or any menu, and there is no sitemap. It is kept out of search indexes two ways: a `noindex` meta tag set by the component, and an `X-Robots-Tag: noindex, nofollow, noarchive` response header added in `vercel.json` for that exact URL. There is deliberately no status lookup, tracking page, or PIN for this module.
+`?page=jlc-report` renders `JlcReportForm.jsx` with the site nav hidden. It is not linked from the landing page, the nav, or any menu, and there is no sitemap. The one exception, added at Brenda's request: a small "City employees: report a facility repair" link below the card on the **Staff Login** screen (`Login.jsx`), which is publicly reachable — so the address is discoverable by anyone who opens that page, and the form's protection rests on the safeguards in §15.4, not on secrecy. It is kept out of search indexes two ways: a `noindex` meta tag set by the component, and an `X-Robots-Tag: noindex, nofollow, noarchive` response header added in `vercel.json` for that exact URL. There is deliberately no status lookup, tracking page, or PIN for this module.
 
 ### 15.7 Printing
 

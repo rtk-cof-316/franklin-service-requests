@@ -424,7 +424,7 @@ function App() {
       {page === 'print-car-packet' && session && isCarAdmin && viewingCarCycleId && (
         <PrintCarPacket cycleId={viewingCarCycleId} onClose={() => setPage('car-cycle-detail')} />
       )}
-      {page === 'login' && !session && <Login />}
+      {page === 'login' && !session && <Login onNavigate={setPage} />}
       {page === 'admin' && session && userRole === 'admin' && (
         <AdminDashboard onViewCase={handleViewCase} refreshKey={refreshKey} onPrintEscalatedReport={() => setPage('print-escalated-report')} />
       )}

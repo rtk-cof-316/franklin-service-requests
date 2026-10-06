@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
+import { JLC_PUBLIC_PAGE } from './jlcConfig'
 
 const styles = {
   page: {
@@ -83,6 +84,15 @@ const styles = {
     cursor: 'not-allowed',
     letterSpacing: '0.3px',
   },
+  wrap: {
+    maxWidth: '440px',
+    width: '100%',
+  },
+  discreetLink: {
+    textAlign: 'center',
+    marginTop: '18px',
+    fontSize: '12px',
+  },
   error: {
     backgroundColor: '#fee2e2',
     border: '1px solid #fca5a5',
@@ -94,7 +104,7 @@ const styles = {
   },
 }
 
-function Login() {
+function Login({ onNavigate }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -115,6 +125,7 @@ function Login() {
 
   return (
     <div style={styles.page}>
+      <div style={styles.wrap}>
       <div style={styles.card}>
         <div style={styles.header}>
           <h1 style={styles.headerTitle}>Staff Login</h1>
@@ -151,6 +162,20 @@ function Login() {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </div>
+      </div>
+      <div style={styles.discreetLink}>
+        <a
+          href={`/?page=${JLC_PUBLIC_PAGE}`}
+          style={{ color: '#6b7280' }}
+          onClick={e => {
+            if (!onNavigate) return
+            e.preventDefault()
+            onNavigate(JLC_PUBLIC_PAGE)
+          }}
+        >
+          City employees: report a facility repair
+        </a>
+      </div>
       </div>
     </div>
   )
