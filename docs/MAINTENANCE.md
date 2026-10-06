@@ -32,6 +32,21 @@ Same pattern as CAR, above — hidden, not removed, because it's no longer in us
 
 If the module is ever fully deleted instead of just hidden, export `mou_submissions`/`mou_submission_field_values`/`mou_activity_log` first regardless — even a dead proposal is a record of a real interaction with an outside organization.
 
+## JLC Facility Repair module (internal-only) — setup and upkeep
+
+See [ARCHITECTURE.md §15](ARCHITECTURE.md#15-jlc-facility-repair-report-module-internal-only) for how it works. What needs attention:
+
+- **Turn on Cloudflare Turnstile (not done yet).** The module needs keys that only the City can create. In Cloudflare, create a Turnstile widget for the production domain, then set `VITE_TURNSTILE_SITE_KEY` in Vercel (and redeploy) and `TURNSTILE_SECRET_KEY` as a Supabase Edge Function secret (`npx supabase secrets set TURNSTILE_SECRET_KEY=...`). **Until both are set the public form is protected only by the hidden honeypot field and the per-IP rate limit**, and the `jlc-submit` function logs a warning on every submission. Because the form has no login and its URL is the only gate, do this before the address is widely circulated.
+- **Decide who gets the new-submission email.** Today it goes to everyone on MSD's roster (looked up the same way as case notifications). If MSD has a shared distribution address, add it (comma-separated) as the `JLC_NOTIFY_EMAIL` secret. The City Manager's Office currently just sees reports in the tab.
+- **`JLC_EMAIL_DRY_RUN` must not be set in production.** It exists for testing (emails are written to the function logs instead of sent). If staff say they aren't getting the MSD notice, check `npx supabase secrets list` for it.
+- **Brevo is the only email path**, as everywhere else — if the MSD or confirmation emails stop arriving, check the Brevo account first. A failed email never blocks a submission, so check the `jlc-submit` logs if reports exist but no email was seen.
+- **Rate limit** (20/hour and 100/day per hashed IP, in `jlc-submit`): City Hall's staff share one outbound IP, so these are generous on purpose. If legitimate staff are ever told "Too many submissions from this location," raise `RATE_LIMIT_PER_HOUR` in the function. The `facility_repair_rate_limits` table cleans itself (rows older than 3 days are deleted on each submission).
+- **Staff access is by login role, not by list.** A new MSD employee sees the tab as soon as their `user_profiles` row has `department` = MSD; a City Manager's Office person needs the `admin` role (there is no City Manager department login today). Removing someone's profile removes their access.
+- **Buildings are data, not code.** Add/edit/archive them from the **Manage Buildings** screen; if a new City building should appear in the form, no deploy is needed.
+- **No retention or auto-delete exists.** These are RSA 91-A-disclosable records and nothing is purged. Photos accumulate in the private `jlc-facility-repair` bucket; if the City sets a retention rule, it needs to be built (delete the database rows and use the Storage API for the files — deleting `storage.objects` rows with SQL leaves the files behind).
+- **Security regression check after any change to this module's tables, policies, or storage:** as the anon key, confirm `select`/`insert`/`update`/`delete` on all six `facility_repair_*` / `city_facilities` tables and storage list/sign on `jlc-facility-repair` are refused (they should return `401 permission denied`), and re-run Supabase's security advisor. The module's security rests on `anon` having **no** grants — avoid broad `GRANT ... TO anon` or "grant all on all tables" statements in future migrations.
+- **Known limitation:** the form checks that the email *ends in* `@franklinnh.gov`, not that the person actually owns it. If abuse ever appears, add email verification.
+
 ## Known issues / technical debt
 
 These are real, currently-live inconsistencies — not bugs severe enough to have blocked shipping other work, but worth knowing about before you touch anything nearby:

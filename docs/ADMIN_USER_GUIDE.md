@@ -19,6 +19,7 @@ This guide is written for the person running the Franklin Service Request System
 13. [MOUs — retired](#13-mous-retired)
 14. [CARs (Council Agenda Reports) — retired](#14-cars-council-agenda-reports-retired)
 15. [Adding or removing a staff login](#15-adding-or-removing-a-staff-login)
+16. [JLC Facility Repairs](#16-jlc-facility-repairs)
 
 ---
 
@@ -26,7 +27,7 @@ This guide is written for the person running the Franklin Service Request System
 
 Click **Staff Login** in the top-right corner of any public page. Enter your email and password and sign in. There is no "create account" option on this page — every staff login has to be set up ahead of time (see [§15](#15-adding-or-removing-a-staff-login)).
 
-Once you're logged in, a second row of buttons appears under the main navigation — this is your "Staff Tools" row. As the admin, you'll see: **Admin**, **Departments**, **Public Comments**.
+Once you're logged in, a second row of buttons appears under the main navigation — this is your "Staff Tools" row. As the admin, you'll see: **Admin**, **Departments**, **Public Comments**, **JLC Facility Repairs** (see [§16](#16-jlc-facility-repairs)).
 
 > **Note:** an **MOUs** button and a **CARs** button used to appear here. Both modules have since been retired (MOU on 2026-09-29, CAR on 2026-09-26 — see [§13](#13-mous-retired) and [§14](#14-cars-council-agenda-reports-retired)), so those buttons, their public submit/status links, and their homepage cards are all gone from the live site now.
 
@@ -41,6 +42,7 @@ To sign out on purpose, click **Log Out** in the top-right corner.
 | **Admin** | The Admin Dashboard — every case, city-wide (§7) |
 | **Departments** | A picker to view any single department's own dashboard, read-only (§8) |
 | **Public Comments** | Manage topics and moderate comments (§12) |
+| **JLC Facility Repairs** | Internal facility repair reports from City employees (§16) — admins, MSD, and City Manager's Office only |
 
 ## 3. How a case enters the system
 
@@ -158,3 +160,63 @@ Click **Public Comments**. Two tabs: **Topics** and **Moderation**.
 ## 15. Adding or removing a staff login
 
 There is no "create account" screen anywhere in this app — this always has to be done directly in the Supabase dashboard by whoever has developer access: create the login under Authentication, then add a matching row for them so the system knows their role and (for a department login) which department they belong to. Ask your developer to do this whenever someone joins or leaves a department.
+
+## 16. JLC Facility Repairs
+
+This is a separate, **internal-only** tool for the Joint Loss Committee. City employees report problems with City-owned buildings (a broken step, a broken lock, a flashing smoke detector light), and MSD logs the repair. It replaces the paper form. **It is not part of Service Requests** — these reports never show up on the Admin Dashboard, in Road Watch, in City Analytics, or anywhere the public can see, because some of them describe security weaknesses.
+
+**Who sees it:** admins, MSD staff, and City Manager's Office staff. You'll find a **JLC Facility Repairs** button in your Staff Tools row. Everyone else gets nothing — no button, and the data is locked at the database level too.
+
+### How employees report a problem
+
+Employees use a form titled **Facility Repair Report** (subtitle "Joint Loss Committee"). **There is no link to it anywhere on the public site** — you share the address with employees yourself (it's the site's address followed by `/?page=jlc-report`), for example in an email or on the intranet. Employees choose a building (or **Other city building** and type the name), enter their department, the specific location, what's wrong, their name, and their city email, and can attach up to 3 photos. The email **must** end in `@franklinnh.gov`; anything else is turned away with "Repair reports can only be submitted by city employees."
+
+When they submit, they see a confirmation number such as **JLC-2026-0001** and an email with the same number. That email deliberately says nothing about the problem itself, and there's no status page or follow-up promise for the employee. **MSD is emailed** that a new report came in (number, building, who reported it) with a link to log in — the details are only visible after logging in.
+
+### The list
+
+Click **JLC Facility Repairs**. You'll see a table with **Confirmation #**, **Building**, **Location**, **Reported**, **Reported By**, **Status**, and **Days Open**. It starts showing **Open** reports only. Use the filters at the top:
+- **Search** by confirmation number or the reporter's name.
+- **Open / Completed / All**.
+- **All Buildings** (or one building, or **Other city building**).
+- **From** and **To** dates (the date reported).
+
+To print blank forms, tick the boxes beside open reports and click **Print Selected**. **Manage Buildings** is at the top right.
+
+### Working a report
+
+Click **View** on a row. The top card shows the original report (building, department, location, date, reporter, email, phone, the problem, and any photos — photo links work for 10 minutes, then reload the page). The original report is **locked** so the record can't be quietly changed; if something was entered wrong (say, the wrong building), an administrator can click **Edit Original Details**, and the change is recorded.
+
+The **Repair Report** card is where MSD records the work. All six fields are required:
+1. **Repairs done by**
+2. **Description of work done**
+3. **Date completed**
+4. **Parts used** (type "None" if there were none)
+5. **Reporter notified of correction on this date**
+6. **Reporter notified via** (**Phone** or **Email**)
+
+You can fill these in over several sessions and click **Save Repair Details** each time. **Mark Completed** stays greyed out until all six are filled in (and the database refuses to complete a report that's missing any). The MSD assistant can enter the repair directly, or enter what the MSD staff member who did the work told them.
+
+**The employee is not emailed automatically when a repair is done.** Contacting them is a manual step for MSD — then record the date and Phone/Email in the last two fields. There are no reminders and no escalation emails for these reports, and they can't be reassigned (they always belong to MSD).
+
+If a report was marked Completed by mistake, a **Reopen** button brings it back to Open (the repair details are kept).
+
+At the bottom, the **Activity Log** lists everything that has happened to the report — who did it, when, what changed, and the old and new values. It can't be edited.
+
+### Printing
+
+On a report's page:
+- **Print Form (blank repair section)** prints the paper-style form with the top half filled in (Building/Department, Location of the Issue, Date, Problem or Repair Needed, Reported by, plus the confirmation number) and the **Repair report** half left as blank ruled lines for handwriting.
+- **Print Completed Record** (available once the report is Completed) prints both halves filled in.
+
+Each prints on one letter-size page, with the Right-to-Know (RSA 91-A) notice in the footer. Click **Print / Save as PDF** on the print page. Printing is recorded in the Activity Log.
+
+### Managing the building list
+
+Click **Manage Buildings**. You can **Add Building** (name and address), **Edit** one, or **Archive** it. Archived buildings disappear from the employee form's dropdown but stay attached to their past reports, and **Restore** brings one back. Buildings can't be deleted, on purpose. The list starts with Police Station, Proulx Community Center, City Hall, Public Library, Fire Station, MSD, and Bessie Rowell Community Center.
+
+### Good to know
+
+- Everything an employee submits is a government record that may be disclosed under RSA 91-A — the form says so above the Submit button.
+- There's no automatic deletion; nothing is removed unless the City decides on a retention rule.
+- Your developer can turn on an extra bot-protection check (Cloudflare Turnstile) for the employee form; until then it relies on a hidden trap field and a submission-rate limit.

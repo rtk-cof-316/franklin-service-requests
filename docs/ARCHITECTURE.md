@@ -18,6 +18,7 @@ Technical reference for maintaining this codebase. It documents the app as it ac
 12. [Auth, roles, and access control](#12-auth-roles-and-access-control)
 13. [Deployment pipeline](#13-deployment-pipeline)
 14. [Tables that exist in this Supabase project but are NOT part of this app](#14-tables-that-exist-in-this-supabase-project-but-are-not-part-of-this-app)
+15. [JLC Facility Repair Report module (internal-only)](#15-jlc-facility-repair-report-module-internal-only)
 
 ---
 
@@ -34,8 +35,9 @@ There are five largely independent workflows sharing one codebase and one Supaba
 | Public Comment | Public Comment | Public Comments (admin) |
 | MOU *(retired 2026-09-29)* | ~~Submit an MOU / Check MOU Status~~ | ~~MOUs (admin)~~ |
 | CAR *(retired 2026-09-26)* | ~~Submit a CAR / Check CAR Status~~ | ~~CARs (gated separately — see §12)~~ |
+| JLC Facility Repairs *(internal, unlisted — §15)* | An unlisted employee-only form, `?page=jlc-report` (not linked anywhere) | JLC Facility Repairs (admin, MSD, City Manager) |
 
-All five talk to the same Supabase Postgres database via the same anon key from the browser, with row-level security (RLS) policies doing the real access control, plus a handful of Supabase Edge Functions that run with the service-role key for anything that needs to bypass RLS (cross-department reads, PIN hashing, sending email).
+All of these talk to the same Supabase Postgres database via the same anon key from the browser, with row-level security (RLS) policies doing the real access control, plus a handful of Supabase Edge Functions that run with the service-role key for anything that needs to bypass RLS (cross-department reads, PIN hashing, sending email).
 
 ## 2. Database schema
 
@@ -169,6 +171,13 @@ src/
 
   # Road Watch
   RoadWatch.jsx / RoadVote.jsx             Public road-issue map/stats + voting widget (embedded, not routed separately)
+
+  # JLC Facility Repairs (internal only — see §15)
+  jlcConfig.js                  Tab label constant, disclaimer text, email-domain rule, date helpers
+  JlcReportForm.jsx             The unlisted public employee form (talks only to the jlc-submit Edge Function)
+  JlcFacilityRepairs.jsx / JlcFacilityRepairDetail.jsx / JlcFacilitiesAdmin.jsx
+                                Internal list / detail + repair form / building manager
+  PrintJlcRepair.jsx            Print view mirroring the paper form (blank repair section, or completed)
 
   # City-wide public transparency
   PublicAnalytics.jsx           "City Analytics" — NOT part of the Public Comment module (a common naming confusion —
@@ -452,3 +461,76 @@ Environment variables actually read by the app: `VITE_SUPABASE_URL`, `VITE_SUPAB
 ## 14. Tables that exist in this Supabase project but are NOT part of this app
 
 This Supabase project (`sdibtkmmcegthmytmzvy`) also contains a completely separate, unrelated set of tables and enums: `complaints`, `complaint_access`, `complaint_audit_log`, `complaint_dashboard` (view), `complaint_repeat_subjects` (view), and enums `complaint_category`, `complaint_status`, `dept_recommendation`, `employee_role`, `final_disposition`, `hr_decision`. This is evidently an internal HR/employee-complaints tool that happens to share this Supabase project. **A repo-wide search for `complaint` across `src/` and `supabase/functions/` returns zero matches** — nothing in this React app reads, writes, or references any of it. If you find these tables while browsing the Supabase dashboard, they are foreign to this application; do not extend, migrate, or document them as part of it, and be careful not to run any schema change against this project without checking which app a table actually belongs to first.
+
+## 15. JLC Facility Repair Report module (internal-only)
+
+An **internal-only** intake and repair log for problems with City-owned buildings (a broken step, a broken lock, a flashing smoke detector), built for the Joint Loss Committee to replace a paper form. It is **not a service request**, lives in its own tables, and feeds nothing public (no analytics, Road Watch, search, exports, or public API). Some reports describe security weaknesses, so the design rule is: **nothing about a report is ever readable or queryable by the public.** The build plan this follows is `JLC-Facility-Repair-Module-Build-Plan.md` in the repo root.
+
+### 15.1 Who can do what
+
+| Who | Access |
+|---|---|
+| Anyone (no login), via the unlisted form | Submit one report (and up to 3 photos) through the `jlc-submit` Edge Function. **Cannot read, list, count, or update anything**; the `anon` role has no privileges on any of these tables, the storage bucket, or the helper RPCs (verified against the live REST API). |
+| `user_profiles.role = 'admin'`, or a `department` login whose department is **MSD** or **City Manager** | See the **JLC Facility Repairs** tab: read everything, log repairs, mark Completed, manage buildings, print. Decided by `public.is_jlc_user()`. |
+| Admins only (`is_jlc_admin()`) | Additionally edit the *original* report details after submission (every change is logged). |
+| Any other login (Fire/Code, PZ, etc.) or a login with no profile | Nothing — RLS returns zero rows and the tab is hidden. |
+
+There is currently no `department`-role login for the City Manager department (the City Manager's Office reaches the tab through the `admin` role); the rule is written to also admit one if it is ever created. The nav tab is only a convenience: `App.jsx` asks the database (`rpc('is_jlc_user')`) whether to show it, but RLS is the real boundary.
+
+### 15.2 Tables (migrations `20261006100000_jlc_facility_repair_module.sql` and `20261006110000_jlc_function_hardening.sql`)
+
+| Table | Purpose |
+|---|---|
+| `city_facilities` | Admin-managed buildings (`name`, `address`, `is_active`). Archive, never delete; seeded with the seven buildings in the plan. The public form's dropdown = active buildings + a hard-coded "Other city building" option. |
+| `facility_repair_reports` | One row per report. **Request half** (set at submission): `facility_id` or `facility_other_name`, `department`, `issue_location`, `reported_date`, `problem_description`, `reported_by_name`, `reporter_email`, `reporter_phone`. **Repair half** (internal): `repaired_by`, `work_description`, `completed_date`, `parts_used`, `reporter_notified_date`, `reporter_notified_via` (`Phone` or `Email`). `status` is `open` or `completed` only. `confirmation_number` is `JLC-<year>-NNNN`. |
+| `facility_repair_attachments` | Photo metadata (`storage_path`, `file_name`, size, type). Max 3 per report (DB trigger), 5 MB or less, images only. |
+| `facility_repair_activity_log` | Field-level audit trail with old/new values. **Written only by database triggers** (and the `log_jlc_print` RPC), never by client code, so it can't be skipped or forged. Also records building add/edit/archive. |
+| `facility_repair_counters` | Per-year counter behind `next_jlc_confirmation_number()` (atomic; resets each January). Service role only. |
+| `facility_repair_rate_limits` | Hashed-IP submission attempts for throttling. Service role only. |
+
+Storage bucket **`jlc-facility-repair` is private** (unlike the older `case-files`, `mou-documents`, and `car-attachments` buckets, which are public — do not copy their policies for anything sensitive). Only the Edge Function writes to it; authorized staff read through short-lived signed URLs (`createSignedUrls`, 10 minutes). The bucket also enforces a 5 MB limit and an image MIME allow-list itself.
+
+### 15.3 Rules enforced in the database (not just the UI)
+
+- **"All six repair fields required to be Completed"** — the `jlc_completed_requires_repair_fields` CHECK constraint. `parts_used` accepts an explicit "None".
+- **Reporter email must be exactly `@franklinnh.gov`** (the `jlc_reporter_email_domain` CHECK) — also enforced in the Edge Function and mirrored in the form.
+- **Request half is locked after submission** except for admins, and confirmation number / submitted time / reported date are immutable for everyone — the `jlc_guard_report_update` trigger. `completed_by_user_id` and `completed_logged_at` are filled in by that trigger and are not client-writable (column-level `UPDATE` grants).
+- **Clients can only SELECT and UPDATE reports** (no INSERT, no DELETE) and only SELECT attachments and the log; the database is the gatekeeper, the UI just reflects it.
+- A completed report can be **reopened** (status back to open, completion metadata cleared, repair details kept, logged). Not in the plan; added so a mis-click is recoverable.
+
+### 15.4 The public submission path (`supabase/functions/jlc-submit`)
+
+The only way an anonymous visitor writes anything. In order: size cap, then reject any form field not on an allow-list (this is what stops callers setting `status` or repair fields), then honeypot (`hp_website`), then a per-IP rate limit (20/hour, 100/day on a salted SHA-256 of the IP; deliberately generous because City Hall shares one outbound IP), then Cloudflare Turnstile (if configured), then field validation and the email-domain rule, then the building must exist and be active (or "other" with a name), then each photo is checked by **magic bytes** rather than client-supplied type or extension (JPEG/PNG/WEBP/HEIC; 5 MB; at most 3), then confirmation number, insert, upload photos to the private bucket, insert attachment rows. Any failure after the report row exists **rolls it back** (deletes the row and any uploaded files). It also serves `{"action":"facilities"}` so the form can fill its dropdown without any table access. (Requests larger than roughly 18 MB are cut off by Supabase's gateway before reaching the function and come back as a 502 — nothing is stored.)
+
+Emails (Brevo; a failure never fails the submission): the **reporter** gets only the confirmation number and a note that follow-up isn't guaranteed — **never the problem description or location**. **MSD** (everyone `resolveDepartmentRecipients` finds for MSD, plus any addresses in the optional `JLC_NOTIFY_EMAIL` secret) gets the confirmation number, building, and reporter name/department, with a login link — also no description or location. All user-supplied values are HTML-escaped. There are **no** automatic emails on repair or closure, no reminders, and no escalation: notifying the reporter is a manual MSD step recorded in `reporter_notified_date` / `reporter_notified_via`.
+
+**Known limitation (also noted in the function's header):** the domain check proves the *format* of an address, not that the person owns it. Turnstile, the rate limit, the honeypot, and the form being unlisted are the practical safeguards; email verification would be the next hardening step.
+
+### 15.5 Configuration and secrets
+
+| Setting | Where | Effect |
+|---|---|---|
+| `VITE_TURNSTILE_SITE_KEY` | Vercel env var | Shows the Turnstile widget on the form. |
+| `TURNSTILE_SECRET_KEY` | Supabase Edge Function secret | Makes the function **require** a valid token. **Until both are set, Turnstile is off** and the function logs a warning on every submission — protection is honeypot + rate limit only. |
+| `JLC_NOTIFY_EMAIL` | Supabase secret (optional) | Extra comma-separated recipients for the new-submission email (the MSD distribution address, if there is one). |
+| `JLC_IP_SALT` | Supabase secret (optional) | Salt for the stored IP hashes. |
+| `JLC_EMAIL_DRY_RUN=1` | Supabase secret | Test mode: emails are written to the function logs instead of sent. **Must not be left on in production.** |
+
+The tab's name lives in one constant, `JLC_TAB_LABEL` in `src/jlcConfig.js`.
+
+### 15.6 The unlisted form
+
+`?page=jlc-report` renders `JlcReportForm.jsx` with the site nav hidden. It is not linked from the landing page, nav, or any menu, and there is no sitemap. It is kept out of search indexes two ways: a `noindex` meta tag set by the component, and an `X-Robots-Tag: noindex, nofollow, noarchive` response header added in `vercel.json` for that exact URL. There is deliberately no status lookup, tracking page, or PIN for this module.
+
+### 15.7 Printing
+
+`PrintJlcRepair.jsx` follows the app's `Print*` convention (browser print / Save as PDF) and mirrors the paper form's labels and order exactly: **Report Request** (Building/Department, Location of the Issue, Date, Problem or Repair Needed, Reported by — pre-filled, with the confirmation number) and **Repair report** (Repairs done by, Description of work done, Date completed, Parts used, Reporter notified of correction on this date, Reporter notified via, with Phone and Email checkboxes). Mode `form` leaves the repair half as ruled blank lines for handwriting; mode `completed` fills both halves. The RSA 91-A disclaimer is in the footer. One report per letter page; bulk "Print Selected" is available for open reports from the list. Each print is recorded in the activity log.
+
+### 15.8 Decisions taken where the plan left an open item
+
+These were unanswered when built; each used the plan's stated default and is easy to change:
+1. **New-submission email** goes to MSD only (City Manager and admins see everything in the tab). Add an address via `JLC_NOTIFY_EMAIL`.
+2. **Request half is locked** except for admins, every change logged.
+3. **Photos**: 5 MB each, images only (JPG, PNG, WEBP, HEIC).
+4. **Disclaimer wording** is the plan's draft text, held in `JLC_DISCLAIMER` (`src/jlcConfig.js`) and printed in the footer; the reporter email does not repeat it.
+5. **No retention or auto-delete** is built in. Add one only if the City sets a retention rule.

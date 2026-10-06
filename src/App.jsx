@@ -39,6 +39,12 @@ import CarCycleDetail from './CarCycleDetail'
 import CarBatchReview from './CarBatchReview'
 import PrintCarAgenda from './PrintCarAgenda'
 import PrintCarPacket from './PrintCarPacket'
+import { JLC_TAB_LABEL } from './jlcConfig'
+import JlcReportForm from './JlcReportForm'
+import JlcFacilityRepairs from './JlcFacilityRepairs'
+import JlcFacilityRepairDetail from './JlcFacilityRepairDetail'
+import JlcFacilitiesAdmin from './JlcFacilitiesAdmin'
+import PrintJlcRepair from './PrintJlcRepair'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -57,6 +63,16 @@ function App() {
   const [viewingCarSubmissionId, setViewingCarSubmissionId] = useState(null)
   const [viewingCarCycleId, setViewingCarCycleId] = useState(null)
   const [viewingCarWorkSessionId, setViewingCarWorkSessionId] = useState(null)
+  const [isJlcUser, setIsJlcUser] = useState(false)
+  const [viewingJlcReportId, setViewingJlcReportId] = useState(null)
+  const [jlcPrint, setJlcPrint] = useState({ ids: [], mode: 'form', returnTo: 'jlc-repairs' })
+
+  // The database decides who can use the JLC module (admin, MSD, City Manager); this only
+  // controls whether the tab is shown. RLS is what actually protects the data.
+  useEffect(() => {
+    if (!session) return
+    supabase.rpc('is_jlc_user').then(({ data }) => setIsJlcUser(data === true))
+  }, [session])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -71,6 +87,7 @@ function App() {
       } else {
         setUserRole(null)
         setUserDepartmentId(null)
+        setIsJlcUser(false)
       }
     })
     return () => subscription.unsubscribe()
@@ -89,6 +106,7 @@ function App() {
         setPage('landing')
         setUserRole(null)
         setUserDepartmentId(null)
+        setIsJlcUser(false)
         setViewingCaseId(null)
       }, 10 * 60 * 1000)
     }
@@ -130,6 +148,7 @@ function App() {
     setPage('landing')
     setUserRole(null)
     setUserDepartmentId(null)
+    setIsJlcUser(false)
     setViewingCaseId(null)
   }
 
@@ -185,6 +204,16 @@ function App() {
     setPage('mou-detail')
   }
 
+  function handleViewJlcReport(reportId) {
+    setViewingJlcReportId(reportId)
+    setPage('jlc-detail')
+  }
+
+  function handlePrintJlc(ids, mode, returnTo) {
+    setJlcPrint({ ids, mode, returnTo })
+    setPage('print-jlc')
+  }
+
   function handlePrintMouAgreement(submissionId) {
     setViewingMouSubmissionId(submissionId)
     setPage('print-mou-agreement')
@@ -223,7 +252,7 @@ function App() {
 
   const isCarAdmin = CAR_MODULE_ENABLED && !!carAdminRole(session?.user?.email)
 
-  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet', 'print-car-submission', 'print-escalated-report'].includes(page)
+  const showNav = !['print-work-order', 'print-case-detail', 'print-bulk-work-orders', 'print-public-input-analysis', 'print-mou-agreement', 'print-car-agenda', 'print-car-packet', 'print-car-submission', 'print-escalated-report', 'print-jlc', 'jlc-report'].includes(page)
 
   const navBtn = (target, label) => (
     <button
@@ -236,6 +265,7 @@ function App() {
           (target === 'admin-department-view' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin-department-view') ||
           (target === 'department' && ['case-detail', 'print-work-order'].includes(page) && previousPage === 'department') ||
           (target === 'admin-public-topics' && page === 'admin-public-moderation') ||
+          (target === 'jlc-repairs' && ['jlc-detail', 'jlc-facilities'].includes(page)) ||
           (target === 'public-input' && ['public-input-detail', 'public-input-submit'].includes(page))
         ) ? '#ffffff' : '#93afd4',
         cursor: 'pointer',
@@ -247,7 +277,7 @@ function App() {
     </button>
   )
 
-  const showStaffRow = session && (userRole === 'admin' || userRole === 'department' || isCarAdmin)
+  const showStaffRow = session && (userRole === 'admin' || userRole === 'department' || isCarAdmin || isJlcUser)
 
   return (
     <div>
@@ -286,10 +316,31 @@ function App() {
           {MOU_MODULE_ENABLED && userRole === 'admin' && navBtn('admin-mou-submissions', 'MOUs')}
           {isCarAdmin && navBtn('admin-car', 'CARs')}
           {userRole === 'department' && navBtn('department', 'My Cases')}
+          {isJlcUser && navBtn('jlc-repairs', JLC_TAB_LABEL)}
         </div>
       )}
 
       {page === 'landing' && <Landing onNavigate={setPage} />}
+      {page === 'jlc-report' && <JlcReportForm />}
+      {page === 'jlc-repairs' && session && isJlcUser && (
+        <JlcFacilityRepairs
+          onViewReport={handleViewJlcReport}
+          onManageBuildings={() => setPage('jlc-facilities')}
+          onPrintSelected={(ids) => handlePrintJlc(ids, 'form', 'jlc-repairs')}
+        />
+      )}
+      {page === 'jlc-detail' && session && isJlcUser && viewingJlcReportId && (
+        <JlcFacilityRepairDetail
+          reportId={viewingJlcReportId}
+          userRole={userRole}
+          onBack={() => setPage('jlc-repairs')}
+          onPrint={(id, mode) => handlePrintJlc([id], mode, 'jlc-detail')}
+        />
+      )}
+      {page === 'jlc-facilities' && session && isJlcUser && <JlcFacilitiesAdmin onBack={() => setPage('jlc-repairs')} />}
+      {page === 'print-jlc' && session && isJlcUser && jlcPrint.ids.length > 0 && (
+        <PrintJlcRepair reportIds={jlcPrint.ids} mode={jlcPrint.mode} onClose={() => setPage(jlcPrint.returnTo)} />
+      )}
       {page === 'submit' && <SubmitForm />}
       {page === 'track' && <CaseTracker />}
       {page === 'roads' && <RoadWatch />}

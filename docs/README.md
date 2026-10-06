@@ -1,6 +1,6 @@
 # Franklin Service Request System
 
-A web application for the City of Franklin, New Hampshire that lets residents report problems (potholes, code violations, trash complaints, Right-to-Know/RSA 91-A records requests, and more) and lets city staff track, route, and resolve them. It also runs a **Public Comment** module for structured resident input ahead of City Council hearings. Two other workflows (**MOU** and **CAR**) exist in the codebase but are currently retired — see below.
+A web application for the City of Franklin, New Hampshire that lets residents report problems (potholes, code violations, trash complaints, Right-to-Know/RSA 91-A records requests, and more) and lets city staff track, route, and resolve them. It also runs a **Public Comment** module for structured resident input ahead of City Council hearings. A separate, internal-only **JLC Facility Repairs** tool lets City employees report problems with City buildings and lets MSD log the repairs (not visible to the public — see [ARCHITECTURE.md §15](ARCHITECTURE.md#15-jlc-facility-repair-report-module-internal-only)). Two other workflows (**MOU** and **CAR**) exist in the codebase but are currently retired — see below.
 
 Live site: **https://franklin-service-requests-39a5.vercel.app**
 
