@@ -171,7 +171,7 @@ This is a separate, **internal-only** tool for the Joint Loss Committee. City em
 
 Employees use a form titled **Facility Repair Report** (subtitle "Joint Loss Committee"). It isn't on the homepage or in any menu. The only place it's linked is a small **City employees: report a facility repair** link under the **Staff Login** box. You can also share the address with employees directly (it's the site's address followed by `/?page=jlc-report`), for example in an email or on the intranet. Employees choose a building (or **Other city building** and type the name), enter their department, the specific location, what's wrong, their name, and their city email, and can attach up to 3 photos. The email **must** end in `@franklinnh.gov`; anything else is turned away with "Repair reports can only be submitted by city employees."
 
-When they submit, they see a confirmation number such as **JLC-2026-0001** and an email with the same number. That email deliberately says nothing about the problem itself, and there's no status page or follow-up promise for the employee. **MSD is emailed** that a new report came in (number, building, who reported it) with a link to log in — the details are only visible after logging in.
+When they submit, they see a confirmation number such as **JLC-2026-0001** and an email with the same number. That email deliberately says nothing about the problem itself, and there's no status page or follow-up promise for the employee. **MSD and the City Manager's Office are emailed** that a new report came in (number, building, who reported it) with a link to log in — the details are only visible after logging in.
 
 ### The list
 

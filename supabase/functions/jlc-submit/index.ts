@@ -328,12 +328,16 @@ Deno.serve(async (req) => {
         <p style="font-size: 13px; color: #6b7280; line-height: 1.6;">Keep this number for your records. Submitting a report does not guarantee follow-up.</p>`),
     )
 
-    // MSD: a heads-up with minimal detail -- they log in to see the report itself.
-    const deptRes = await rest('departments?select=id&name=eq.MSD')
-    const msdId = (await deptRes.json())?.[0]?.id
+    // MSD and the City Manager's Office: a heads-up with minimal detail -- they log in to see
+    // the report itself. (Both can open the JLC tab, so both are told when something arrives.)
     const recipients = new Set<string>()
-    if (msdId) {
-      for (const e of await resolveDepartmentRecipients(msdId, 'MSD', serviceRoleKey, SUPABASE_URL)) recipients.add(e)
+    for (const deptName of ['MSD', 'City Manager']) {
+      const deptRes = await rest(`departments?select=id&name=eq.${encodeURIComponent(deptName)}`)
+      const deptId = (await deptRes.json())?.[0]?.id
+      if (!deptId) continue
+      for (const e of await resolveDepartmentRecipients(deptId, deptName, serviceRoleKey, SUPABASE_URL)) {
+        recipients.add(e.toLowerCase())
+      }
     }
     for (const e of (Deno.env.get('JLC_NOTIFY_EMAIL') || '').split(',')) {
       if (e.trim()) recipients.add(e.trim())
