@@ -6,6 +6,7 @@ const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const RESTRICTED_ISSUE_TYPE_NAME = 'Noise / Nuisance / Animal / Crime'
+const RTK_ISSUE_TYPE_NAME = 'Right to Know Request'
 
 // Departments Brenda is the routing override recipient for (see departmentRecipients.ts).
 // New-case notifications to her are limited to these, since every other department now
@@ -465,6 +466,22 @@ function SubmitForm() {
     if (restrictedCheckIssueType && restrictedCheckIssueType.name === RESTRICTED_ISSUE_TYPE_NAME) {
       setShowPoliceModal(true)
       return
+    }
+
+    // The Right-to-Know checkbox sits at the very top of the form and is easy to tick by
+    // accident on an ordinary service request (e.g. 376-26). A 91-A case skips department
+    // auto-close and gets the records workflow, so double-check when the issue type picked
+    // doesn't look like a records request.
+    if (formData.is_91a && restrictedCheckIssueType && restrictedCheckIssueType.name !== RTK_ISSUE_TYPE_NAME) {
+      const confirmed = window.confirm(
+        `You checked "Right-to-Know request (RSA 91-A)", but chose the issue type "${restrictedCheckIssueType.name}".\n\n` +
+        'A Right-to-Know request is a request for copies of public records. If you are reporting an issue or asking for a service, it is not a Right-to-Know request.\n\n' +
+        'Click OK to submit this as a Right-to-Know request, or Cancel to uncheck the box and review your request.'
+      )
+      if (!confirmed) {
+        setFormData(prev => ({ ...prev, is_91a: false }))
+        return
+      }
     }
 
     setLoading(true)
