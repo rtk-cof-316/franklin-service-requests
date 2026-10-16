@@ -349,6 +349,11 @@ const [savingArchive, setSavingArchive] = useState(false)
     const statusChanged = Boolean(newStatusName && newStatusName !== oldStatusName)
     const newStatusIsClosing = allStatuses.find(s => s.id === newStatusId)?.is_closing
     const oldStatusIsClosing = allStatuses.find(s => s.name === oldStatusName)?.is_closing
+    const isReferral = statusChanged && newStatusName === REFERRED_STATUS_NAME && adminReferTargetDept[cdId]
+    if (isReferral && !(await insertReferralAssignment(parseInt(adminReferTargetDept[cdId])))) {
+      setSavingDeptId(null)
+      return
+    }
     const updatePayload = { status_id: newStatusId }
     if (statusChanged) updatePayload.status_changed_at = new Date().toISOString()
     if (statusChanged && newStatusIsClosing) updatePayload.closed_date = new Date().toISOString()
@@ -358,8 +363,8 @@ const [savingArchive, setSavingArchive] = useState(false)
       if (statusChanged) {
         await logAudit(caseId, `${deptName} status updated from "${oldStatusName || 'none'}" to "${newStatusName}" by admin`, userEmail)
       }
-      if (statusChanged && newStatusName === REFERRED_STATUS_NAME && adminReferTargetDept[cdId]) {
-        await referCaseToDepartment(parseInt(adminReferTargetDept[cdId]), deptName)
+      if (isReferral) {
+        await announceReferral(parseInt(adminReferTargetDept[cdId]), deptName)
         setAdminReferTargetDept(prev => ({ ...prev, [cdId]: '' }))
       }
       if (statusChanged && newStatusIsClosing) {
@@ -391,6 +396,11 @@ const [savingArchive, setSavingArchive] = useState(false)
     const newStatus = allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name
     const statusChanged = Boolean(newStatus && newStatus !== oldStatus)
     const oldFollowup = caseData.followup_due_date ? caseData.followup_due_date.slice(0, 10) : ''
+    const isReferral = statusChanged && newStatus === REFERRED_STATUS_NAME && referTargetDept
+    if (isReferral && !(await insertReferralAssignment(parseInt(referTargetDept)))) {
+      setSavingDeptStatus(false)
+      return
+    }
     await supabase.from('cases').update({ followup_due_date: followupDate || null }).eq('id', caseId)
     const deptUpdatePayload = { status_id: parseInt(deptSelectedStatus) }
     if (statusChanged) deptUpdatePayload.status_changed_at = new Date().toISOString()
@@ -406,8 +416,8 @@ const [savingArchive, setSavingArchive] = useState(false)
     if (auditParts.length > 0) {
       await supabase.from('case_audit_log').insert([{ case_id: caseId, action: auditParts.join(', '), performed_by: userEmail, created_at: new Date().toISOString() }])
     }
-    if (statusChanged && newStatus === REFERRED_STATUS_NAME && referTargetDept) {
-      await referCaseToDepartment(parseInt(referTargetDept), myDeptAssignment.departments?.name)
+    if (isReferral) {
+      await announceReferral(parseInt(referTargetDept), myDeptAssignment.departments?.name)
       setReferTargetDept('')
     }
     if (statusChanged && selectedStatusIsClosing) {
@@ -488,10 +498,23 @@ const [savingArchive, setSavingArchive] = useState(false)
     setSavingComment(false)
   }
 
-  async function referCaseToDepartment(targetDeptId, fromDeptName) {
-    const targetDeptName = departments.find(d => d.id === targetDeptId)?.name
+  // Creates the target department's assignment row. Called *before* the referring department's
+  // status is changed, so if the insert is rejected (e.g. by RLS) the caller can stop without
+  // leaving the case with only a closed "Referred" row — which checkAutoCloseCase would then
+  // close outright, after the target department had already been emailed about it.
+  async function insertReferralAssignment(targetDeptId) {
     const defaultStatus = allStatuses.find(s => s.name === 'Received')
-    await supabase.from('case_departments').insert([{ case_id: caseId, department_id: targetDeptId, status_id: defaultStatus?.id || allStatuses[0]?.id }])
+    const { error } = await supabase.from('case_departments').insert([{ case_id: caseId, department_id: targetDeptId, status_id: defaultStatus?.id || allStatuses[0]?.id }])
+    if (error) {
+      console.error('Referral insert error:', error)
+      alert(`The referral could not be saved, so the case was not changed.\n\n${error.message}`)
+      return false
+    }
+    return true
+  }
+
+  async function announceReferral(targetDeptId, fromDeptName) {
+    const targetDeptName = departments.find(d => d.id === targetDeptId)?.name
     await logAudit(caseId, `Referred from ${fromDeptName} to ${targetDeptName}`, userEmail)
     try {
       await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
