@@ -1,4 +1,4 @@
-import { resolveDepartmentRecipients } from '../_shared/departmentRecipients.ts'
+import { resolveCaseAssignmentRecipients } from '../_shared/departmentRecipients.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
       }),
     })
 
-    const emails = await resolveDepartmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
+    const emails = await resolveCaseAssignmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
     const results = []
     for (const email of emails) {
       const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
   if (body.type === 'department_assignment') {
     const { departmentId, caseNumber, location, description, departmentName } = body
 
-    const emails = await resolveDepartmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
+    const emails = await resolveCaseAssignmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
 
     if (emails.length === 0) {
       return new Response(JSON.stringify({ success: true, message: 'No recipients for department' }), {

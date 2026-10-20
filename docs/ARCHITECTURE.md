@@ -224,6 +224,8 @@ A department (or an admin, on a department's row) can refer a case to a differen
 
 `supabase/functions/_shared/departmentRecipients.ts` exports `resolveDepartmentRecipients(departmentId, departmentName, ...)`, used by every Edge Function that emails a department (assignment, referral, reminders, escalation). It checks a hardcoded `DEPARTMENT_EMAIL_OVERRIDES` map first (currently `City Manager`, `IT`, and `Assessing` — the last one being a **one-time snapshot** of Fire/Code's roster from 2026-09-17, not a live mirror); if a department isn't in that map, it looks up `user_profiles` for that `department_id` and resolves each to a real email via the Supabase Admin Auth API. **If Fire/Code's roster changes, `Assessing`'s override needs a manual edit — it will not update itself.**
 
+The "New Case Assigned" email (auto-routing on submission, manual assignment, referrals) uses `resolveCaseAssignmentRecipients()`, which is the same lookup minus any address in `CASE_ASSIGNMENT_EXCLUDED` (currently `bdemers@franklinnh.gov`, who already gets a dedicated `admin_new_case` alert for every submitted case and so would otherwise receive two emails per case). Reminders, escalations, and the JLC new-report notice still use the unfiltered `resolveDepartmentRecipients()`. Side effect: IT's only recipient is `bdemers@`, so an IT-routed case sends no assignment email at all (the `admin_new_case` alert still goes out).
+
 ### 4.4 Auto-closing a case
 
 Once every `case_departments` row for a case reaches an `is_closing` status, the parent `cases` row closes automatically and the resident gets an email — this happens as a side effect inside the same save path that updates a department's status (`CaseDetail.jsx`), not a separate scheduled job.
