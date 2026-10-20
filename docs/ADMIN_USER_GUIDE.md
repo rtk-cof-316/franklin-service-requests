@@ -42,7 +42,7 @@ To sign out on purpose, click **Log Out** in the top-right corner.
 |---|---|
 | **Admin** | The Admin Dashboard — every case, city-wide (§7) |
 | **Departments** | A picker to view any single department's own dashboard, read-only (§8) |
-| **Public Comments** | Manage topics and moderate comments (§12) |
+| **Public Comments** | Create, edit, and close Public Comment topics (§12) |
 | **JLC Facility Repairs** | Internal facility repair reports from City employees (§16) — admins, MSD, and City Manager's Office only |
 
 ## 3. How a case enters the system
@@ -144,11 +144,9 @@ This runs automatically, once a day, with no action needed from you:
 
 ## 12. Public Comment
 
-Click **Public Comments**. Two tabs: **Topics** and **Moderation**.
+Click **Public Comments** to manage topics. Click **+ New Topic** to create one: Title, Description, Reference URL, Hearing Date, Hearing Time, Hearing Location, Comment Period Opens, Comment Period Closes (both required), and at least one Position (add more with **+ Add another position**). Click **Save Topic**. Every topic starts out **active**. Once its comment window has passed, the public pages already treat it as closed for new submissions — but it will still show as "active" in your own Topics list until you explicitly click **Close Topic** on it (this also archives it publicly and stamps the close date). If you try to remove a position that already has comments attached to it, you'll get a warning and it will be left in place rather than deleted.
 
-**Topics tab** — click **+ New Topic** to create one: Title, Description, Reference URL, Hearing Date, Hearing Time, Hearing Location, Comment Period Opens, Comment Period Closes (both required), and at least one Position (add more with **+ Add another position**). Click **Save Topic**. Every topic starts out **active**. Once its comment window has passed, the public pages already treat it as closed for new submissions — but it will still show as "active" in your own Topics list until you explicitly click **Close Topic** on it (this also archives it publicly and stamps the close date). If you try to remove a position that already has comments attached to it, you'll get a warning and it will be left in place rather than deleted.
-
-**Moderation tab** — a single queue of every pending comment across all topics (filter by topic with the dropdown at top), oldest first. Each card shows the commenter's name/ward, the topic and position they picked, their comment, and — if they flagged one — their questions and concern themes (shown for your context only; you can't edit these). Click **Approve** or **Reject**. There's no bulk action — it's one at a time, by design. Only approved comments (and their questions/themes) ever become visible to the public anywhere.
+**There is no moderation.** When a resident submits a comment it is published on the topic page immediately — nobody reviews it first, and there is no approval queue. (The form already tells commenters their submission becomes part of the public record as soon as they click submit.) The form still blocks anonymous-looking names and catches simple spam bots, and comments can only be submitted while a topic's comment period is open. If a comment ever has to come down (for example, it contains someone's private information), there is no button for it — ask your developer to hide it, which takes one database change.
 
 ## 13. MOUs — retired
 

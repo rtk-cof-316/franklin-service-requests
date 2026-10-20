@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import AdminModeration from './AdminModeration'
 
 const styles = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
   container: { maxWidth: '900px', margin: '0 auto' },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' },
   headerTitle: { fontSize: '22px', fontWeight: '700', color: '#1a56a0', margin: 0 },
-  tabStrip: { display: 'flex', gap: '4px', marginBottom: '20px' },
-  tab: { padding: '8px 18px', backgroundColor: '#ffffff', border: '1px solid #d1d5db', color: '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' },
-  tabActive: { padding: '8px 18px', backgroundColor: '#1a56a0', border: '1px solid #1a56a0', color: '#ffffff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', borderRadius: '6px' },
   newBtn: { padding: '8px 16px', backgroundColor: '#1a56a0', border: 'none', color: '#ffffff', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   card: { backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '20px', marginBottom: '16px' },
   topicTitleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -53,7 +49,6 @@ const emptyForm = {
 }
 
 function AdminTopics() {
-  const [view, setView] = useState('topics')
   const [topics, setTopics] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -194,28 +189,9 @@ function AdminTopics() {
     await loadTopics()
   }
 
-  if (view === 'moderation') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.tabStrip}>
-            <button style={styles.tab} onClick={() => setView('topics')}>Topics</button>
-            <button style={styles.tabActive} onClick={() => setView('moderation')}>Moderation</button>
-          </div>
-        </div>
-        <AdminModeration />
-      </div>
-    )
-  }
-
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.tabStrip}>
-          <button style={styles.tabActive} onClick={() => setView('topics')}>Topics</button>
-          <button style={styles.tab} onClick={() => setView('moderation')}>Moderation</button>
-        </div>
-
         <div style={styles.headerRow}>
           <h1 style={styles.headerTitle}>Public Comment Topics</h1>
           {!showForm && <button style={styles.newBtn} onClick={startNew}>+ New Topic</button>}

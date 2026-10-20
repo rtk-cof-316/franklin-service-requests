@@ -10,7 +10,7 @@ For the full technical writeup (schema, module internals, routing logic), see [A
 
 - **Residents (the public)** — no login. Submit a request, check the status of one they already made, browse a live map of road issues and vote on repair priorities, view city-wide statistics, or weigh in on an open Public Comment topic.
 - **Department staff** — log in to see and work only the cases assigned to their own department (MSD, Fire/Code, PZ, Assessing, Police/Prosecutor, Finance, Human Resources, Legal, Parks & Rec, IT, or City Manager).
-- **Admin (the City Manager's Office)** — sees every case city-wide, manages department routing, moderates Public Comment, and reviews escalated cases. Currently one person, Brenda Demers.
+- **Admin (the City Manager's Office)** — sees every case city-wide, manages department routing, manages Public Comment topics, and reviews escalated cases. Currently one person, Brenda Demers.
 
 > **CAR (Council Agenda Report) module — retired 2026-09-26.** A workflow for building City Council meeting agendas from department heads' reports. Hidden from every entry point via a single flag; code, database tables, and the one real historical submission/meeting cycle are all untouched — see [ARCHITECTURE.md §9](ARCHITECTURE.md#9-car-council-agenda-report-module-retired).
 >

@@ -18,7 +18,6 @@ import PublicInputTopic from './PublicInputTopic'
 import PrintPublicInputTopic from './PrintPublicInputTopic'
 import PublicInputSubmit from './PublicInputSubmit'
 import AdminTopics from './AdminTopics'
-import AdminModeration from './AdminModeration'
 import AdminDepartmentView from './AdminDepartmentView'
 import { MOU_MODULE_ENABLED } from './mouConfig'
 import MouSubmit from './MouSubmit'
@@ -274,7 +273,6 @@ function App() {
           (target === 'admin' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin') ||
           (target === 'admin-department-view' && ['case-detail', 'print-work-order', 'print-case-detail'].includes(page) && previousPage === 'admin-department-view') ||
           (target === 'department' && ['case-detail', 'print-work-order'].includes(page) && previousPage === 'department') ||
-          (target === 'admin-public-topics' && page === 'admin-public-moderation') ||
           (target === 'jlc-repairs' && ['jlc-detail', 'jlc-facilities'].includes(page)) ||
           (target === 'public-input' && ['public-input-detail', 'public-input-submit'].includes(page))
         ) ? '#ffffff' : '#93afd4',
@@ -449,7 +447,6 @@ function App() {
         <AdminDepartmentView onViewCase={handleViewCase} refreshKey={refreshKey} onBulkPrint={handleBulkPrint} />
       )}
       {page === 'admin-public-topics' && session && userRole === 'admin' && <AdminTopics />}
-      {page === 'admin-public-moderation' && session && userRole === 'admin' && <AdminModeration />}
       {page === 'department' && session && userRole === 'department' && (
         <DepartmentDashboard
           departmentId={userDepartmentId}

@@ -9,8 +9,6 @@ import {
   isTopicOpen,
 } from './publicInputValidation'
 
-const SUPABASE_URL = 'https://sdibtkmmcegthmytmzvy.supabase.co'
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const WARDS = ['Ward 1', 'Ward 2', 'Ward 3']
 const MAX_QUESTIONS = 15
@@ -387,9 +385,8 @@ function PublicInputSubmit({ topicId, onBack, onSubmitted }) {
 
     setSubmitting(true)
 
-    // The id is generated client-side (rather than read back via .select()) because the
-    // public insert RLS policy only allows selecting approved comments — a pending row's
-    // id would be unreadable to the anon client immediately after insert.
+    // The id is generated client-side so the questions/themes below can reference it without
+    // reading the new row back.
     const newCommentId = crypto.randomUUID()
 
     const { error } = await supabase
@@ -402,7 +399,7 @@ function PublicInputSubmit({ topicId, onBack, onSubmitted }) {
         ward,
         comment_text: commentText.trim(),
         has_concern: hasConcern,
-        status: 'pending',
+        status: 'approved',
       }])
 
     if (error) {
@@ -423,16 +420,6 @@ function PublicInputSubmit({ topicId, onBack, onSubmitted }) {
       await supabase.from('comment_concern_themes').insert(rows)
     }
 
-    try {
-      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ type: 'public_comment_pending', topicTitle: topic.title, commentId: newCommentId }),
-      })
-    } catch (emailError) {
-      console.error('Moderator alert email error:', emailError)
-    }
-
     setSubmitting(false)
     setSubmitted(true)
   }
@@ -447,11 +434,11 @@ function PublicInputSubmit({ topicId, onBack, onSubmitted }) {
         <div style={styles.successCard}>
           <div style={styles.successHeader}>
             <div style={styles.successIcon}>✓</div>
-            <h2 style={styles.successTitle}>Comment Received</h2>
+            <h2 style={styles.successTitle}>Comment Posted</h2>
           </div>
           <div style={styles.successBody}>
             <p style={styles.successText}>
-              Thank you. Your public comment has been received and is pending publication.
+              Thank you. Your public comment has been posted and is now visible on the topic page.
             </p>
             <button style={{ ...styles.submitBtn, marginTop: '16px' }} onClick={onSubmitted}>
               Back to Topic

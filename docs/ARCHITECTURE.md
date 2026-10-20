@@ -75,7 +75,7 @@ All schema below was read directly from the live Supabase project (`sdibtkmmcegt
 |---|---|
 | `topics` | `title`, `description`, `reference_url`, `hearing_date/time/location`, `comment_opens_at`, `comment_closes_at`, `status` (`active`\|`closed`), `closed_at`. See §7 for the important distinction between the time-window check every public page uses and this `status` column, which only an explicit admin click ever changes. |
 | `topic_positions` | Admin-defined position options per topic (e.g. For/Against) — plain label + sort order. |
-| `comments` | `topic_id`, `position_id`, `name`, `ward`, `comment_text`, `has_concern`, `status` (`pending`\|`approved`\|`rejected`). Every public comment lands as `pending`; nothing is ever auto-approved. |
+| `comments` | `topic_id`, `position_id`, `name`, `ward`, `comment_text`, `has_concern`, `status` (`pending`\|`approved`\|`rejected`). **There is no moderation (removed 2026-10-20):** every public comment is inserted as `approved` and is live immediately. The RLS policy `comments_public_insert` only lets the public insert `approved` rows, and only while the topic's comment window is open; the column default is also `approved`. `pending` and `rejected` remain valid enum values — setting a row to `rejected` (admin UPDATE or SQL) hides it everywhere the public reads from, and is the only way to take a comment down now. |
 | `concern_themes` | Admin-defined theme labels (with a `group_label` for grouping), independent of any topic. |
 | `comment_concern_themes` | Join table: which themes a given (approved-eligible) comment flagged. Entered by the **submitter at submission time** — there is no admin UI to add/edit these after the fact. |
 | `comment_questions` | Free-text questions a submitter attaches to their comment, also submitter-entered only. |
@@ -147,8 +147,7 @@ src/
   PublicInput.jsx              Public topic list
   PublicInputTopic.jsx         Public single-topic analysis + comment feed
   PublicInputSubmit.jsx        Public comment submission form
-  AdminTopics.jsx               Admin topic management (embeds AdminModeration.jsx as a tab)
-  AdminModeration.jsx           Admin moderation queue
+  AdminTopics.jsx               Admin topic management (create / edit / close topics)
   PrintPublicInputTopic.jsx     Printable topic analysis report
   publicInputValidation.js      Shared honeypot/blocked-name/disclaimer helpers
 
@@ -315,7 +314,7 @@ Nothing financial or appointment-related, ever. `CaseTracker.jsx`'s list and det
 
 ### 7.1 Flow
 
-Admin creates a topic (`AdminTopics.jsx`, "Topics" tab) with a title, description, reference URL, hearing date/time/location, a required comment-open/close window, and at least one position — always created with `status: 'active'`. Residents browse open topics (`PublicInput.jsx`), view a topic's live position/concern-theme breakdown and the approved-comment feed (`PublicInputTopic.jsx`), and submit a comment (`PublicInputSubmit.jsx`) with a name, ward, position, comment text, and — only if they check "I have a specific question or concern for council" — free-text questions and/or concern-theme checkboxes, **all entered by the submitter at that moment**; there is no admin UI to add or edit questions/themes on a comment afterward. Every new comment lands as `status: 'pending'`. An admin moderates one at a time in a single chronological FIFO queue (`AdminModeration.jsx`, filterable by topic) — there is no bulk approve/reject anywhere in this module. Only `status: 'approved'` comments (and their questions/themes) ever become visible anywhere public — the analysis charts, the comment feed, the printable report (`PrintPublicInputTopic.jsx`), and the tally on the topic list all filter on this.
+Admin creates a topic (`AdminTopics.jsx`) with a title, description, reference URL, hearing date/time/location, a required comment-open/close window, and at least one position — always created with `status: 'active'`. Residents browse open topics (`PublicInput.jsx`), view a topic's live position/concern-theme breakdown and the approved-comment feed (`PublicInputTopic.jsx`), and submit a comment (`PublicInputSubmit.jsx`) with a name, ward, position, comment text, and — only if they check "I have a specific question or concern for council" — free-text questions and/or concern-theme checkboxes, **all entered by the submitter at that moment**; there is no admin UI to add or edit questions/themes on a comment afterward. **There is no moderation step:** the comment is inserted as `status: 'approved'` and appears on the topic page immediately (the form's disclaimer already tells commenters their submission is published as soon as they click submit). The former moderation queue (`AdminModeration.jsx`) and the "Moderation" tab were removed on 2026-10-20, as was a "moderator alert" email call that never had a handler in `send-confirmation-email`. Public pages (analysis charts, comment feed, `PrintPublicInputTopic.jsx`, the topic-list tally) still filter on `status = 'approved'`, so setting a comment's status to `rejected` in SQL is the way to remove one. Spam/abuse protection is unchanged and now matters more: the honeypot, the blocked-name filter (§7.3), and the open-window check in the insert policy.
 
 ### 7.2 Two independent notions of "closed" — don't conflate them
 
@@ -435,7 +434,7 @@ Both use a centered, seal-less "CITY COUNCIL MEETING" letterhead — a deliberat
 
 ## 11. Email system
 
-Every transactional email funnels through **one** Edge Function, `send-confirmation-email`, dispatched by a `type` field in the request body — despite the name, it is not case-system-specific; it also handles every MOU and CAR notification (`mou_submitted`, `mou_sent_back_missing_information`, `mou_ready_for_council`, `mou_council_decision`, `car_submitted`, `car_new_submission`, `car_rejected`, `car_approved_normal`/`car_approved_hot`, `car_reassigned`, and more — grep `body.type ===` in that file for the full current list before assuming a type exists). Public Comment's confirmation email (`public_comment_pending`) also goes through this same function.
+Every transactional email funnels through **one** Edge Function, `send-confirmation-email`, dispatched by a `type` field in the request body — despite the name, it is not case-system-specific; it also handles every MOU and CAR notification (`mou_submitted`, `mou_sent_back_missing_information`, `mou_ready_for_council`, `mou_council_decision`, `car_submitted`, `car_new_submission`, `car_rejected`, `car_approved_normal`/`car_approved_hot`, `car_reassigned`, and more — grep `body.type ===` in that file for the full current list before assuming a type exists). (Public Comment no longer sends any email.)
 
 `daily-case-check` (the scheduled silence/escalation job, see §5) sends its own emails directly via a small `sendBrevoEmail` helper rather than going through `send-confirmation-email` — it's a separate Edge Function with its own Brevo call.
 
