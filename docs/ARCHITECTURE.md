@@ -19,6 +19,7 @@ Technical reference for maintaining this codebase. It documents the app as it ac
 13. [Deployment pipeline](#13-deployment-pipeline)
 14. [Tables that exist in this Supabase project but are NOT part of this app](#14-tables-that-exist-in-this-supabase-project-but-are-not-part-of-this-app)
 15. [JLC Facility Repair Report module (internal-only)](#15-jlc-facility-repair-report-module-internal-only)
+16. [System Feedback (staff report issues / request features)](#16-system-feedback-staff-report-issues--request-features)
 
 ---
 
@@ -35,6 +36,7 @@ There are five largely independent workflows sharing one codebase and one Supaba
 | Public Comment | Public Comment | Public Comments (admin) |
 | MOU *(retired 2026-09-29)* | ~~Submit an MOU / Check MOU Status~~ | ~~MOUs (admin)~~ |
 | CAR *(retired 2026-09-26)* | ~~Submit a CAR / Check CAR Status~~ | ~~CARs (gated separately — see §12)~~ |
+| System Feedback *(internal, logged-in only — §16)* | — (not reachable without logging in) | Report an Issue / Request a Feature (any staff); System Feedback inbox (superuser only) |
 | JLC Facility Repairs *(internal, unlisted — §15)* | An unlisted employee-only form, `?page=jlc-report` (not linked anywhere) | JLC Facility Repairs (admin, MSD, City Manager) |
 
 All of these talk to the same Supabase Postgres database via the same anon key from the browser, with row-level security (RLS) policies doing the real access control, plus a handful of Supabase Edge Functions that run with the service-role key for anything that needs to bypass RLS (cross-department reads, PIN hashing, sending email).
@@ -178,6 +180,11 @@ src/
   JlcFacilityRepairs.jsx / JlcFacilityRepairDetail.jsx / JlcFacilitiesAdmin.jsx
                                 Internal list / detail + repair form / building manager
   PrintJlcRepair.jsx            Print view mirroring the paper form (blank repair section, or completed)
+
+  # System Feedback (internal only — see §16)
+  feedbackConfig.js             Tab labels, status names/colours
+  SystemFeedbackForm.jsx        Staff form + "My Submissions"
+  SystemFeedbackInbox.jsx       Superuser inbox (filter, status, response, history)
 
   # City-wide public transparency
   PublicAnalytics.jsx           "City Analytics" — NOT part of the Public Comment module (a common naming confusion —
@@ -534,3 +541,50 @@ These were unanswered when built; each used the plan's stated default and is eas
 3. **Photos**: 5 MB each, images only (JPG, PNG, WEBP, HEIC).
 4. **Disclaimer wording** is the plan's draft text, held in `JLC_DISCLAIMER` (`src/jlcConfig.js`) and printed in the footer; the reporter email does not repeat it.
 5. **No retention or auto-delete** is built in. Add one only if the City sets a retention rule.
+
+## 16. System Feedback (staff report issues / request features)
+
+A small internal channel so logged-in staff can tell the system's owner about a problem or an idea. **Nothing here is reachable without logging in**, and nothing is public. Built 2026-10-20.
+
+### 16.1 What it is
+
+- **Staff form** — a tab, **Report an Issue / Request a Feature**, visible to any logged-in user who has a `user_profiles` row (admin or department). Two types ("Report an Issue" / "Request a Feature"), a short title, a description, and an optional "which screen?". Below the form, **My Submissions** shows that person's own items with their status and any response.
+- **Superuser inbox** — a tab, **System Feedback**, visible only to a *system superuser*: every submission, filters (type / status / search), and per-item status + a response the submitter can see, with a history log. Statuses: New, In Review, Planned, In Progress, Done, Won't Do.
+- **Notification** — each submission emails the superuser (default `brenda@groundworkguild.co`, overridable with the `FEEDBACK_NOTIFY_EMAIL` secret). The email carries only the type, title, submitter, and an inbox link — **never the description**, because staff sometimes paste resident details and the recipient's mailbox is outside the City's domain.
+
+### 16.2 How access works
+
+| Who | Can |
+|---|---|
+| Anyone not logged in | Nothing. No privileges on the tables; the Edge Function rejects missing, anon-key-only, or invalid tokens. |
+| Any logged-in staff (has a `user_profiles` row) | Submit (via the Edge Function) and read **only their own** submissions, including the status and response the superuser sets. Cannot edit, delete, or read the log or other people's items. |
+| A system superuser | Read every submission and the history log; update only `status` and `response` (column-level grant — they can't rewrite what a person wrote). |
+| Other admins (e.g. A. Holgate, the City Manager) | Treated like any staff member: own submissions only. The inbox is deliberately superuser-only. |
+
+**Superusers live in their own table, `system_superusers`, not as a flag on `user_profiles`.** `user_profiles` has an "admin full access" policy, so a flag there could be set by any admin on themselves. `system_superusers` has RLS on, no policies and no grants — rows are added only with SQL (the dashboard SQL editor or a migration). `is_system_superuser()` (security definer) is what the policies and the nav tab consult. A superuser account should *also* have `role = 'admin'` in `user_profiles` so every existing admin screen works for them unchanged; the superuser row adds only the inbox.
+
+### 16.3 Pieces
+
+| Piece | Where |
+|---|---|
+| Tables `system_feedback`, `system_feedback_log`, `system_superusers`, function `is_system_superuser()` | migration `20261020100000_system_feedback.sql` |
+| Edge Function `system-feedback-submit` | Validates the caller's session (via `/auth/v1/user`), requires a staff profile, validates type/length, caps 25 submissions/user/day, inserts with the service role, emails the superuser. Clients have no INSERT privilege, so every row goes through it. Extra fields a caller sends (e.g. `status`) are ignored. |
+| `src/feedbackConfig.js`, `SystemFeedbackForm.jsx`, `SystemFeedbackInbox.jsx` | Labels/status colours; the staff form + My Submissions; the superuser inbox |
+| `App.jsx` | Pages `feedback-form` (any staff) and `feedback-inbox` (superuser). Nav tab visibility comes from `rpc('is_system_superuser')`, but RLS is the real boundary. |
+
+The history log is written by database triggers (not client code), recording who changed a status or response and the old/new values.
+
+### 16.4 Adding or removing a superuser
+
+The person needs a Supabase Auth account first (created by hand in the dashboard — there is no signup). Then, in the SQL editor:
+
+```sql
+-- make them an admin (so all existing admin screens work) ...
+insert into public.user_profiles (user_id, role)
+select id, 'admin' from auth.users where email = 'person@example.com';
+-- ... and a system superuser (unlocks the System Feedback inbox)
+insert into public.system_superusers (user_id)
+select id from auth.users where email = 'person@example.com';
+```
+
+Remove a superuser with `delete from public.system_superusers where user_id = ...`.

@@ -47,6 +47,16 @@ See [ARCHITECTURE.md §15](ARCHITECTURE.md#15-jlc-facility-repair-report-module-
 - **Security regression check after any change to this module's tables, policies, or storage:** as the anon key, confirm `select`/`insert`/`update`/`delete` on all six `facility_repair_*` / `city_facilities` tables and storage list/sign on `jlc-facility-repair` are refused (they should return `401 permission denied`), and re-run Supabase's security advisor. The module's security rests on `anon` having **no** grants — avoid broad `GRANT ... TO anon` or "grant all on all tables" statements in future migrations.
 - **Known limitation:** the form checks that the email *ends in* `@franklinnh.gov`, not that the person actually owns it. If abuse ever appears, add email verification.
 
+## System Feedback — setup and upkeep
+
+See [ARCHITECTURE.md §16](ARCHITECTURE.md#16-system-feedback-staff-report-issues--request-features).
+
+- **The superuser account must exist before the inbox works.** `brenda@groundworkguild.co` has to be created by hand in Supabase (Authentication → Add user, email confirmed — there is no signup screen), then given its profile and superuser rows with the two SQL statements in ARCHITECTURE.md §16.4. Until then nobody can see the inbox; staff can still submit and the emails still go out.
+- **Who is emailed:** `brenda@groundworkguild.co` by default; change it with the `FEEDBACK_NOTIFY_EMAIL` Supabase secret (`npx supabase secrets set FEEDBACK_NOTIFY_EMAIL=...`). `FEEDBACK_EMAIL_DRY_RUN=1` is a test-only switch that logs emails instead of sending them — it must not be left on.
+- **Superuser rows are SQL-only on purpose.** If the superuser's login ever changes, add the new account and remove the old one (§16.4); don't try to move the flag onto `user_profiles`.
+- **`bdemers@franklinnh.gov` is still hard-coded across the system** — it is the notification address for City Manager and IT (`DEPARTMENT_EMAIL_OVERRIDES` in `supabase/functions/_shared/departmentRecipients.ts`), for new-case and escalation emails and referral notices in `send-confirmation-email`, and the contact address shown on the site footer, the request form's terms text, and the case emails. If that mailbox is no longer monitored these go nowhere useful. A replacement address has been requested but not yet chosen; it should be a single follow-up change. (The retired CAR/MOU modules and the CAR database policy also reference it, but they are switched off.)
+- **Security regression check:** as the anon key, `system_feedback`, `system_feedback_log` and `system_superusers` should all return `401 permission denied`, and the submit function should reject a request with only the anon key. As an ordinary staff login, only your own rows should be visible.
+
 ## Known issues / technical debt
 
 These are real, currently-live inconsistencies — not bugs severe enough to have blocked shipping other work, but worth knowing about before you touch anything nearby:

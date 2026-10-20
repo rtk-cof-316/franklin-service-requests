@@ -45,6 +45,9 @@ import JlcFacilityRepairs from './JlcFacilityRepairs'
 import JlcFacilityRepairDetail from './JlcFacilityRepairDetail'
 import JlcFacilitiesAdmin from './JlcFacilitiesAdmin'
 import PrintJlcRepair from './PrintJlcRepair'
+import { FEEDBACK_TAB_LABEL, FEEDBACK_INBOX_LABEL } from './feedbackConfig'
+import SystemFeedbackForm from './SystemFeedbackForm'
+import SystemFeedbackInbox from './SystemFeedbackInbox'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -64,6 +67,7 @@ function App() {
   const [viewingCarCycleId, setViewingCarCycleId] = useState(null)
   const [viewingCarWorkSessionId, setViewingCarWorkSessionId] = useState(null)
   const [isJlcUser, setIsJlcUser] = useState(false)
+  const [isSuperuser, setIsSuperuser] = useState(false)
   const [viewingJlcReportId, setViewingJlcReportId] = useState(null)
   const [jlcPrint, setJlcPrint] = useState({ ids: [], mode: 'form', returnTo: 'jlc-repairs' })
 
@@ -72,6 +76,9 @@ function App() {
   useEffect(() => {
     if (!session) return
     supabase.rpc('is_jlc_user').then(({ data }) => setIsJlcUser(data === true))
+    // Superuser flag lives in a locked-down table; this only decides whether to show the
+    // System Feedback inbox tab -- RLS is what actually protects the data.
+    supabase.rpc('is_system_superuser').then(({ data }) => setIsSuperuser(data === true))
   }, [session])
 
   useEffect(() => {
@@ -88,6 +95,7 @@ function App() {
         setUserRole(null)
         setUserDepartmentId(null)
         setIsJlcUser(false)
+        setIsSuperuser(false)
       }
     })
     return () => subscription.unsubscribe()
@@ -107,6 +115,7 @@ function App() {
         setUserRole(null)
         setUserDepartmentId(null)
         setIsJlcUser(false)
+        setIsSuperuser(false)
         setViewingCaseId(null)
       }, 10 * 60 * 1000)
     }
@@ -149,6 +158,7 @@ function App() {
     setUserRole(null)
     setUserDepartmentId(null)
     setIsJlcUser(false)
+    setIsSuperuser(false)
     setViewingCaseId(null)
   }
 
@@ -317,11 +327,15 @@ function App() {
           {isCarAdmin && navBtn('admin-car', 'CARs')}
           {userRole === 'department' && navBtn('department', 'My Cases')}
           {isJlcUser && navBtn('jlc-repairs', JLC_TAB_LABEL)}
+          {userRole && navBtn('feedback-form', FEEDBACK_TAB_LABEL)}
+          {isSuperuser && navBtn('feedback-inbox', FEEDBACK_INBOX_LABEL)}
         </div>
       )}
 
       {page === 'landing' && <Landing onNavigate={setPage} />}
       {page === 'jlc-report' && <JlcReportForm />}
+      {page === 'feedback-form' && session && userRole && <SystemFeedbackForm />}
+      {page === 'feedback-inbox' && session && isSuperuser && <SystemFeedbackInbox />}
       {page === 'jlc-repairs' && session && isJlcUser && (
         <JlcFacilityRepairs
           onViewReport={handleViewJlcReport}

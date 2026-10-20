@@ -20,6 +20,7 @@ This guide is written for the person running the Franklin Service Request System
 14. [CARs (Council Agenda Reports) — retired](#14-cars-council-agenda-reports-retired)
 15. [Adding or removing a staff login](#15-adding-or-removing-a-staff-login)
 16. [JLC Facility Repairs](#16-jlc-facility-repairs)
+17. [Report an Issue / Request a Feature (and the System Feedback inbox)](#17-report-an-issue--request-a-feature-and-the-system-feedback-inbox)
 
 ---
 
@@ -220,3 +221,9 @@ Click **Manage Buildings**. You can **Add Building** (name and address), **Edit*
 - Everything an employee submits is a government record that may be disclosed under RSA 91-A — the form says so above the Submit button.
 - There's no automatic deletion; nothing is removed unless the City decides on a retention rule.
 - Your developer can turn on an extra bot-protection check (Cloudflare Turnstile) for the employee form; until then it relies on a hidden trap field and a submission-rate limit.
+
+## 17. Report an Issue / Request a Feature (and the System Feedback inbox)
+
+**For any staff member.** After logging in, click **Report an Issue / Request a Feature** in the Staff Tools row. Choose **Report an Issue** (something is broken or confusing) or **Request a Feature** (something you wish the system did), give it a short title, describe it, optionally say which screen it's about, and click **Send**. Please don't include residents' personal information. Under the form, **My Submissions** lists everything you've sent with its status (**New**, **In Review**, **Planned**, **In Progress**, **Done**, **Won't Do**) and any reply from the system administrator. Only you and the system administrator can see your submissions, and nothing is visible to the public.
+
+**For the system administrator (superuser only).** A **System Feedback** button also appears in your Staff Tools row. It lists every submission (newest first, finished items hidden by default); filter by type or status, or search. Click a row to read the full description, set its **Status**, and write a **Response** that the person will see under My Submissions, then click **Save**. The **History** at the bottom shows who changed what and when. You'll also get an email for each new submission with the type, title and who sent it — the full description is only in the inbox. Other admins can submit feedback like any staff member but can't see the inbox.
