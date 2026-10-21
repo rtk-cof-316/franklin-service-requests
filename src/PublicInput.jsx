@@ -105,6 +105,48 @@ const styles = {
     color: '#1e40af',
     marginBottom: '16px',
   },
+  archiveFilter: {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '14px 16px',
+    marginBottom: '16px',
+    textAlign: 'left',
+  },
+  archiveFilterLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#374151',
+  },
+  archiveFilterInput: {
+    padding: '8px 10px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '13px',
+    fontFamily: 'inherit',
+  },
+  archiveFilterClear: {
+    padding: '8px 14px',
+    backgroundColor: '#ffffff',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#374151',
+    cursor: 'pointer',
+  },
+  archiveFilterNote: {
+    fontSize: '12px',
+    color: '#6b7280',
+    width: '100%',
+  },
   actionRow: {
     display: 'flex',
     gap: '10px',
@@ -256,6 +298,8 @@ function PublicInput({ onViewTopic, onSubmitTopic }) {
   const [tallies, setTallies] = useState({})
   const [loading, setLoading] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
+  const [hearingFrom, setHearingFrom] = useState('')
+  const [hearingTo, setHearingTo] = useState('')
 
   useEffect(() => {
     loadTopics()
@@ -283,6 +327,19 @@ function PublicInput({ onViewTopic, onSubmitTopic }) {
 
   const activeTopics = topics.filter(t => isTopicOpen(t))
   const archivedTopics = topics.filter(t => !isTopicOpen(t))
+
+  // hearing_date is a plain 'YYYY-MM-DD' date, as are the date inputs, so string comparison
+  // is a correct date comparison. A topic with no hearing date can't match a date range.
+  const dateFilterOn = Boolean(hearingFrom || hearingTo)
+  const visibleArchived = archivedTopics.filter(t => {
+    if (!dateFilterOn) return true
+    if (!t.hearing_date) return false
+    if (hearingFrom && t.hearing_date < hearingFrom) return false
+    if (hearingTo && t.hearing_date > hearingTo) return false
+    return true
+  })
+  const undatedArchived = archivedTopics.filter(t => !t.hearing_date).length
+  const rangeBackwards = Boolean(hearingFrom && hearingTo && hearingFrom > hearingTo)
 
   return (
     <div style={styles.page}>
@@ -331,7 +388,31 @@ function PublicInput({ onViewTopic, onSubmitTopic }) {
               </span>
               <span style={styles.archiveChevron}>{showArchive ? '▲ Hide' : '▼ Show'}</span>
             </button>
-            {showArchive && archivedTopics.map(topic => (
+            {showArchive && (
+              <div style={styles.archiveFilter}>
+                <label style={styles.archiveFilterLabel}>
+                  Hearing date from
+                  <input type="date" style={styles.archiveFilterInput} value={hearingFrom} onChange={e => setHearingFrom(e.target.value)} />
+                </label>
+                <label style={styles.archiveFilterLabel}>
+                  to
+                  <input type="date" style={styles.archiveFilterInput} value={hearingTo} onChange={e => setHearingTo(e.target.value)} />
+                </label>
+                {dateFilterOn && (
+                  <button style={styles.archiveFilterClear} onClick={() => { setHearingFrom(''); setHearingTo('') }}>Clear</button>
+                )}
+                <div style={styles.archiveFilterNote}>
+                  {dateFilterOn
+                    ? `Showing ${visibleArchived.length} of ${archivedTopics.length} archived topic${archivedTopics.length === 1 ? '' : 's'}.${undatedArchived > 0 ? ` ${undatedArchived} with no hearing date ${undatedArchived === 1 ? 'is' : 'are'} hidden while a date is set.` : ''}`
+                    : 'Choose a start and/or end date to find topics by the date of their public hearing.'}
+                  {rangeBackwards && ' The start date is after the end date.'}
+                </div>
+              </div>
+            )}
+            {showArchive && visibleArchived.length === 0 && (
+              <div style={styles.emptyState}>No archived topics have a public hearing in that date range.</div>
+            )}
+            {showArchive && visibleArchived.map(topic => (
               <TopicCard
                 key={topic.id}
                 topic={topic}
