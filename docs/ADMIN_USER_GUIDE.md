@@ -36,6 +36,8 @@ Once you're logged in, a second row of buttons appears under the main navigation
 
 To sign out on purpose, click **Log Out** in the top-right corner.
 
+**To change your password,** click **Change Password** next to Log Out (it appears for every logged-in user, admins included). Enter your current password, then your new password twice (at least 8 characters, and different from the old one). If you forget your password there's no "forgot password" screen — ask your developer to reset it in Supabase.
+
 ## 2. The screens you'll use
 
 | Button | Takes you to |

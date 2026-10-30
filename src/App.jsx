@@ -47,6 +47,7 @@ import PrintJlcRepair from './PrintJlcRepair'
 import { FEEDBACK_TAB_LABEL, FEEDBACK_INBOX_LABEL } from './feedbackConfig'
 import SystemFeedbackForm from './SystemFeedbackForm'
 import SystemFeedbackInbox from './SystemFeedbackInbox'
+import ChangePassword from './ChangePassword'
 
 function App() {
   const [page, setPage] = useState(() => {
@@ -303,9 +304,14 @@ function App() {
           {CAR_MODULE_ENABLED && navBtn('car-status', 'Check CAR Status')}
           <div style={{ marginLeft: 'auto' }}>
             {session ? (
+              <>
+              <button onClick={() => setPage('change-password')} style={{ background: 'none', border: 'none', color: page === 'change-password' ? '#ffffff' : '#93afd4', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: '4px 12px', marginRight: '4px' }}>
+                Change Password
+              </button>
               <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
                 Log Out
               </button>
+              </>
             ) : (
               <button onClick={() => setPage('login')} style={{ background: 'none', border: '1px solid #93afd4', color: '#93afd4', cursor: 'pointer', fontSize: '13px', padding: '4px 12px', borderRadius: '4px' }}>
                 Staff Login
@@ -332,6 +338,7 @@ function App() {
 
       {page === 'landing' && <Landing onNavigate={setPage} />}
       {page === 'jlc-report' && <JlcReportForm />}
+      {page === 'change-password' && session && <ChangePassword userEmail={session.user.email} />}
       {page === 'feedback-form' && session && userRole && <SystemFeedbackForm />}
       {page === 'feedback-inbox' && session && isSuperuser && <SystemFeedbackInbox />}
       {page === 'jlc-repairs' && session && isJlcUser && (
