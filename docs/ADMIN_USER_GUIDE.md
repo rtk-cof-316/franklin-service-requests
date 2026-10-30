@@ -55,7 +55,7 @@ A resident fills out **Submit a Request** (no login needed). They pick an **issu
 | Health or Building Code Violation | Fire/Code |
 | Zoning /Land Use Violation | PZ |
 | Property Assessment / Valuation | **Both** Assessing and Fire/Code |
-| Website / Communications | IT |
+| Website / Communications | City Manager |
 | Right to Know Request, Other | City Manager |
 | Noise / Nuisance / Animal / Crime | *(blocked — the resident is redirected to the police non-emergency line instead of being allowed to submit)* |
 
@@ -64,6 +64,8 @@ This table reflects real settings that get adjusted from time to time as workflo
 A case can also be checked as a **Right-to-Know request (RSA 91-A)** — that's a separate checkbox from the issue type, and it triggers its own extra fields and workflow (see [§9](#9-right-to-know-rsa-91-a-requests)).
 
 The moment a case is submitted, it's automatically assigned to the right department (or departments) and that department gets a notification email — you don't have to manually route a normal case.
+
+**Only five departments use this system:** MSD, Fire/Code, PZ, Assessing, and the City Manager's Office. Legal, Police/Prosecutor, Parks & Rec, IT, Finance, and Human Resources don't, so cases can't be assigned or referred to them. Under the status field on a case, staff see a notice explaining what to do instead: email that department directly, close out the case on their end, and add a public comment saying who has the case and why. (Past cases that were handled by those departments still show them.)
 
 ## 4. Triaging and routing a case
 

@@ -49,8 +49,10 @@ function AdminDepartmentView({ onViewCase, refreshKey, onBulkPrint }) {
 
   useEffect(() => {
     async function loadDepartments() {
-      const { data } = await supabase.from('departments').select('id, name').order('name')
-      setDepartments(data || [])
+      const { data } = await supabase.from('departments').select('id, name, is_active').order('name')
+      // Departments that don't use the system have no dashboard worth opening; their past
+      // cases remain findable from the Admin Dashboard's department filter.
+      setDepartments((data || []).filter(d => d.is_active !== false))
     }
     loadDepartments()
   }, [])

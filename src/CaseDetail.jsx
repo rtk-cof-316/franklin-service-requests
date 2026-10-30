@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import CaseFiles from './CaseFiles'
+import RetiredDepartmentsNote from './RetiredDepartmentsNote'
 
 const styles = {
   page: { minHeight: '100vh', backgroundColor: '#f0f4f8', padding: '32px 24px', fontFamily: "'Segoe UI', Arial, sans-serif" },
@@ -647,8 +648,12 @@ async function handleArchiveCheckbox(field, value, label) {
   // that already had (and finished) an earlier round on it is a normal, expected loop
   // (e.g. PZ -> Fire/Code -> PZ), so referral targets exclude only the department doing
   // the referring, never the case's full history.
-  const availableDepts = departments.filter(d => !assignedDeptNames.includes(d.name))
-  const referableDepts = (excludeDeptName) => departments.filter(d => d.name !== excludeDeptName)
+  // Departments that don't use the system (is_active = false) are never offered as a target;
+  // staff see a notice explaining how to hand a case to them by email instead.
+  const activeDepartments = departments.filter(d => d.is_active !== false)
+  const retiredDepartmentNames = departments.filter(d => d.is_active === false).map(d => d.name)
+  const availableDepts = activeDepartments.filter(d => !assignedDeptNames.includes(d.name))
+  const referableDepts = (excludeDeptName) => activeDepartments.filter(d => d.name !== excludeDeptName)
   const showAppointment = APPOINTMENT_METHODS.includes(rtkFields.delivery_method)
   const totalTimeMinutes = timeLog.reduce((sum, e) => sum + e.minutes, 0)
   const totalTimeCost = timeLog.reduce((sum, e) => sum + parseFloat(e.cost), 0)
@@ -1118,6 +1123,7 @@ async function handleArchiveCheckbox(field, value, label) {
                   <option value="">-- Select status --</option>
                   {deptStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
+                <RetiredDepartmentsNote names={retiredDepartmentNames} style={{ marginTop: '-6px' }} />
                 {allStatuses.find(s => s.id === parseInt(deptSelectedStatus))?.name === REFERRED_STATUS_NAME && (
                   <>
                     <div style={{ ...styles.fieldLabel, marginBottom: '6px' }}>Refer To Department</div>
@@ -1187,6 +1193,7 @@ async function handleArchiveCheckbox(field, value, label) {
                   </div>
                 ))
               )}
+              {isAdmin && <RetiredDepartmentsNote names={retiredDepartmentNames} style={{ marginTop: '4px' }} />}
               {isAdmin && availableDepts.length > 0 && (
                 <div style={styles.addDeptRow}>
                   <select style={{ ...styles.select, marginBottom: 0, flex: 1 }} value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>

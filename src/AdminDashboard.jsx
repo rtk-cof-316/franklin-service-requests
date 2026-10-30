@@ -536,7 +536,7 @@ function AdminDashboard({ onViewCase, refreshKey, onPrintEscalatedReport }) {
             </select>
             <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={styles.filterSelect}>
               <option value="all">All Departments</option>
-              {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+              {departments.map(d => <option key={d.id} value={d.name}>{d.name}{d.is_active === false ? ' (no longer used)' : ''}</option>)}
             </select>
             <select value={issueTypeFilter} onChange={e => setIssueTypeFilter(e.target.value)} style={styles.filterSelect}>
               <option value="all">All Issue Types</option>
