@@ -39,7 +39,7 @@ POLICE MATTERS
 This system is not connected to the Franklin Police Department. If your request involves a police matter or a records request from the police, we will close the request here and direct you to contact Franklin Police Department directly at (603) 934-2535.
 
 QUESTIONS
-If you have questions about how this system works or about a specific request, contact bdemers@franklinnh.gov`
+If you have questions about how this system works or about a specific request, contact cmoffice@franklinnh.gov`
 
 const styles = {
   page: {
