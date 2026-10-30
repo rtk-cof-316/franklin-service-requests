@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
               </div>
               <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
               <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
-                <strong>Please do not reply to this email.</strong> If you have questions, contact the City Manager's Office at <a href="mailto:bdemers@franklinnh.gov" style="color: #1a56a0;">bdemers@franklinnh.gov</a>.
+                <strong>Please do not reply to this email.</strong> If you have questions, contact the City Manager's Office at <a href="mailto:cmoffice@franklinnh.gov" style="color: #1a56a0;">cmoffice@franklinnh.gov</a>.
               </div>
             </div>
             <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
       body: JSON.stringify({
         sender: { name: 'Franklin Service Request System', email: 'noreply.franklin.sr@gmail.com' },
-        to: [{ email: 'bdemers@franklinnh.gov' }],
+        to: [{ email: 'cmoffice@franklinnh.gov' }],
         subject: `📬 New Request Just Came In — Case #${caseNumber}`,
         htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -750,7 +750,7 @@ Deno.serve(async (req) => {
             <p style="font-size: 13px; color: #6b7280; line-height: 1.6;">You can use your case number to look up the status of your request at any time on our public dashboard.</p>
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
             <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
-              <strong>Please do not reply to this email.</strong> If you have questions, contact the City Manager's Office at <a href="mailto:bdemers@franklinnh.gov" style="color: #1a56a0;">bdemers@franklinnh.gov</a>.
+              <strong>Please do not reply to this email.</strong> If you have questions, contact the City Manager's Office at <a href="mailto:cmoffice@franklinnh.gov" style="color: #1a56a0;">cmoffice@franklinnh.gov</a>.
             </div>
           </div>
           <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">

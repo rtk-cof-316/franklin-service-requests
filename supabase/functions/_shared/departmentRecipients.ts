@@ -3,8 +3,8 @@
 // that department. This override map takes precedence over the dynamic
 // user_profiles -> Admin Auth API lookup used for every other department.
 const DEPARTMENT_EMAIL_OVERRIDES: Record<string, string[]> = {
-  'City Manager': ['bdemers@franklinnh.gov', 'citymgr@franklinnh.gov'],
-  'IT': ['bdemers@franklinnh.gov'],
+  'City Manager': ['cmoffice@franklinnh.gov', 'citymgr@franklinnh.gov'],
+  'IT': ['cmoffice@franklinnh.gov'],
   // Assessing has one real user_profiles account (assessingdept@franklinnh.gov, split out
   // of the old PZA department bucket on 2026-09-17) plus everyone currently on Fire/Code —
   // a one-time snapshot of Fire/Code's roster as of 2026-09-17, not a live mirror. If
@@ -15,7 +15,7 @@ const DEPARTMENT_EMAIL_OVERRIDES: Record<string, string[]> = {
 // Addresses that already get their own alert for every new case ('admin_new_case' in
 // send-confirmation-email) and so are left off the per-department "New Case Assigned"
 // email — otherwise they receive two emails for the same case.
-const CASE_ASSIGNMENT_EXCLUDED = new Set(['bdemers@franklinnh.gov'])
+const CASE_ASSIGNMENT_EXCLUDED = new Set(['cmoffice@franklinnh.gov'])
 
 // Recipients for the "New Case Assigned" email (auto-routing on submission, manual
 // assignment, and referrals). Reminders, escalations, and the JLC notice deliberately keep
