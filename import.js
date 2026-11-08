@@ -40,7 +40,7 @@ function mapDept(deptName) {
     'MSD': 'MSD',
     'Fire/Code': 'Fire/Code',
     'PZA': 'PZA',
-    'City Manager': 'City Manager',
+    'City Manager': "City Manager's Office",
     'Police/Prosecutor': 'Police/Prosecutor',
     'Finance': 'Finance',
     'Legal': 'Legal',

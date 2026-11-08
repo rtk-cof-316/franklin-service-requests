@@ -11,7 +11,7 @@ const RTK_ISSUE_TYPE_NAME = 'Right to Know Request'
 // Departments Brenda is the routing override recipient for (see departmentRecipients.ts).
 // New-case notifications to her are limited to these, since every other department now
 // handles its own incoming cases without her involvement.
-const ADMIN_ASSOCIATED_DEPARTMENTS = ['City Manager', 'IT']
+const ADMIN_ASSOCIATED_DEPARTMENTS = ["City Manager's Office", 'IT']
 
 const POLICE_REFERRAL_TEXT = `This is a non-emergency request system and is not designed to address noise, nuisance, animal, or crime-related concerns — these need to be reported directly to the Franklin Police Department for a timely response.
 

@@ -51,10 +51,10 @@ Deno.serve(async (req) => {
   const supabaseUrl = 'https://sdibtkmmcegthmytmzvy.supabase.co'
   const authHeaders = { 'apikey': serviceRoleKey, 'Authorization': `Bearer ${serviceRoleKey}` }
 
-  // Escalation notices go to the City Manager himself ('City Manager (Direct)', citymgr@),
-  // not the Office. Look up that department's id once — only used as a
+  // Escalation notices go to the City Manager himself (the 'City Manager' department, citymgr@),
+  // not the City Manager's Office. Look up that department's id once — only used as a
   // resolveDepartmentRecipients argument, which short-circuits on the name override anyway.
-  const cmDeptRes = await fetch(`${supabaseUrl}/rest/v1/departments?name=eq.${encodeURIComponent('City Manager (Direct)')}&select=id`, { headers: authHeaders })
+  const cmDeptRes = await fetch(`${supabaseUrl}/rest/v1/departments?name=eq.${encodeURIComponent('City Manager')}&select=id`, { headers: authHeaders })
   const cmDeptRows = await cmDeptRes.json()
   const cmDepartmentId = cmDeptRows?.[0]?.id ?? null
 
@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
     }
 
     // City Manager notice
-    const cmEmails = await resolveDepartmentRecipients(cmDepartmentId, 'City Manager (Direct)', serviceRoleKey, supabaseUrl)
+    const cmEmails = await resolveDepartmentRecipients(cmDepartmentId, 'City Manager', serviceRoleKey, supabaseUrl)
     const cmSubject = `🔺 Escalation — Case #${caseNumber} Open 2+ Weeks (${deptName})`
     const assignedDateFormatted = new Date(cd.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const cmHtml = `

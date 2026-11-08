@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
     // MSD and the City Manager's Office: a heads-up with minimal detail -- they log in to see
     // the report itself. (Both can open the JLC tab, so both are told when something arrives.)
     const recipients = new Set<string>()
-    for (const deptName of ['MSD', 'City Manager']) {
+    for (const deptName of ['MSD', "City Manager's Office"]) {
       const deptRes = await rest(`departments?select=id&name=eq.${encodeURIComponent(deptName)}`)
       const deptId = (await deptRes.json())?.[0]?.id
       if (!deptId) continue

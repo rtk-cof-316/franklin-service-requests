@@ -3,11 +3,12 @@
 // that department. This override map takes precedence over the dynamic
 // user_profiles -> Admin Auth API lookup used for every other department.
 const DEPARTMENT_EMAIL_OVERRIDES: Record<string, string[]> = {
-  // 'City Manager' is the City Manager's Office (the cityhall@ / cmoffice@ admins). Cases that
-  // need the City Manager himself go to the separate 'City Manager (Direct)' department, and
-  // 2-week escalation notices also go to him (daily-case-check).
-  'City Manager': ['cityhall@franklinnh.gov', 'cmoffice@franklinnh.gov'],
-  'City Manager (Direct)': ['citymgr@franklinnh.gov'],
+  // "City Manager's Office" is the cityhall@ / cmoffice@ admins (it receives the auto-routed
+  // cases). 'City Manager' is the City Manager himself (citymgr@): cases reach it only by manual
+  // assignment/referral, and 2-week escalation notices also go to him (daily-case-check).
+  // (These two were renamed 2026-11-08 from 'City Manager' and 'City Manager (Direct)'.)
+  "City Manager's Office": ['cityhall@franklinnh.gov', 'cmoffice@franklinnh.gov'],
+  'City Manager': ['citymgr@franklinnh.gov'],
   'IT': ['cmoffice@franklinnh.gov'],
   // Assessing has one real user_profiles account (assessingdept@franklinnh.gov, split out
   // of the old PZA department bucket on 2026-09-17) plus everyone currently on Fire/Code —
