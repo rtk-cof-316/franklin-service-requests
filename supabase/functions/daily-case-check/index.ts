@@ -51,9 +51,10 @@ Deno.serve(async (req) => {
   const supabaseUrl = 'https://sdibtkmmcegthmytmzvy.supabase.co'
   const authHeaders = { 'apikey': serviceRoleKey, 'Authorization': `Bearer ${serviceRoleKey}` }
 
-  // Look up City Manager's department id once — only used as a resolveDepartmentRecipients
-  // argument, which short-circuits on the name override anyway, but keeps the call sensible.
-  const cmDeptRes = await fetch(`${supabaseUrl}/rest/v1/departments?name=eq.City%20Manager&select=id`, { headers: authHeaders })
+  // Escalation notices go to the City Manager himself ('City Manager (Direct)', citymgr@),
+  // not the Office. Look up that department's id once — only used as a
+  // resolveDepartmentRecipients argument, which short-circuits on the name override anyway.
+  const cmDeptRes = await fetch(`${supabaseUrl}/rest/v1/departments?name=eq.${encodeURIComponent('City Manager (Direct)')}&select=id`, { headers: authHeaders })
   const cmDeptRows = await cmDeptRes.json()
   const cmDepartmentId = cmDeptRows?.[0]?.id ?? null
 
@@ -195,7 +196,7 @@ Deno.serve(async (req) => {
 
     // Department-facing warning
     const deptEmails = await resolveDepartmentRecipients(cd.department_id, deptName, serviceRoleKey, supabaseUrl)
-    const deptSubject = `⚠️ Case #${caseNumber} Will Be Escalated to the City Manager's Office`
+    const deptSubject = `⚠️ Case #${caseNumber} Will Be Escalated to the City Manager`
     const deptHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #d97706; padding: 24px 32px;">
@@ -203,7 +204,7 @@ Deno.serve(async (req) => {
           <p style="color: #fef3c7; margin: 4px 0 0 0; font-size: 13px;">Franklin Service Request System</p>
         </div>
         <div style="padding: 32px; border: 1px solid #e5e7eb;">
-          <p style="font-size: 15px; color: #111827;"><strong>${deptName}</strong>, this case has gone 2+ weeks with no comment or status update. Because it's crossed the 2-week mark, we're notifying the City Manager's Office so they're aware.</p>
+          <p style="font-size: 15px; color: #111827;"><strong>${deptName}</strong>, this case has gone 2+ weeks with no comment or status update. Because it's crossed the 2-week mark, we're notifying the City Manager so he's aware.</p>
           <p style="font-size: 13px; color: #6b7280;">This case is still yours to resolve — nothing has been reassigned.</p>
           <div style="background-color: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; padding: 16px; margin: 20px 0;">
             <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #92400e; margin-bottom: 4px;">Case Number</div>
@@ -230,8 +231,8 @@ Deno.serve(async (req) => {
       await sendBrevoEmail(brevoKey, email, deptSubject, deptHtml)
     }
 
-    // City Manager's Office notice
-    const cmEmails = await resolveDepartmentRecipients(cmDepartmentId, 'City Manager', serviceRoleKey, supabaseUrl)
+    // City Manager notice
+    const cmEmails = await resolveDepartmentRecipients(cmDepartmentId, 'City Manager (Direct)', serviceRoleKey, supabaseUrl)
     const cmSubject = `🔺 Escalation — Case #${caseNumber} Open 2+ Weeks (${deptName})`
     const assignedDateFormatted = new Date(cd.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const cmHtml = `
@@ -263,7 +264,7 @@ Deno.serve(async (req) => {
           </div>
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
           <div style="background-color: #f9fafb; border-left: 3px solid #d1d5db; padding: 12px 16px; font-size: 12px; color: #6b7280; line-height: 1.6;">
-            This is an automated notification sent to the City Manager's Office. Please do not reply to this email.
+            This is an automated notification sent to the City Manager. Please do not reply to this email.
           </div>
         </div>
         <div style="padding: 16px 32px; text-align: center; font-size: 11px; color: #9ca3af;">
@@ -286,7 +287,7 @@ Deno.serve(async (req) => {
       headers: { ...authHeaders, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
       body: JSON.stringify({
         case_id: cd.case_id,
-        action: `Escalated to City Manager's Office — no comment or status update in 2+ weeks`,
+        action: `Escalated to the City Manager — no comment or status update in 2+ weeks`,
         performed_by: 'System Notification',
         created_at: new Date().toISOString(),
       }),

@@ -3,7 +3,11 @@
 // that department. This override map takes precedence over the dynamic
 // user_profiles -> Admin Auth API lookup used for every other department.
 const DEPARTMENT_EMAIL_OVERRIDES: Record<string, string[]> = {
-  'City Manager': ['cmoffice@franklinnh.gov', 'citymgr@franklinnh.gov'],
+  // 'City Manager' is the City Manager's Office (the cityhall@ / cmoffice@ admins). Cases that
+  // need the City Manager himself go to the separate 'City Manager (Direct)' department, and
+  // 2-week escalation notices also go to him (daily-case-check).
+  'City Manager': ['cityhall@franklinnh.gov', 'cmoffice@franklinnh.gov'],
+  'City Manager (Direct)': ['citymgr@franklinnh.gov'],
   'IT': ['cmoffice@franklinnh.gov'],
   // Assessing has one real user_profiles account (assessingdept@franklinnh.gov, split out
   // of the old PZA department bucket on 2026-09-17) plus everyone currently on Fire/Code —
@@ -12,14 +16,15 @@ const DEPARTMENT_EMAIL_OVERRIDES: Record<string, string[]> = {
   'Assessing': ['AssessingDept@franklinnh.gov', 'mfoss@franklinnh.gov', 'sbreault@franklinnh.gov', 'dhall@franklinnh.gov', 'fdoffice@franklinnh.gov'],
 }
 
-// Addresses that already get their own alert for every new case ('admin_new_case' in
-// send-confirmation-email) and so are left off the per-department "New Case Assigned"
-// email — otherwise they receive two emails for the same case.
-const CASE_ASSIGNMENT_EXCLUDED = new Set(['cmoffice@franklinnh.gov'])
+// Addresses that already get their own alert for every NEW case ('admin_new_case' in
+// send-confirmation-email) and so are left off the "New Case Assigned" email sent at the
+// moment of submission — otherwise they receive two emails for the same case.
+const CASE_ASSIGNMENT_EXCLUDED = new Set(['cmoffice@franklinnh.gov', 'cityhall@franklinnh.gov'])
 
-// Recipients for the "New Case Assigned" email (auto-routing on submission, manual
-// assignment, and referrals). Reminders, escalations, and the JLC notice deliberately keep
-// using resolveDepartmentRecipients so those still reach everyone on the department's list.
+// Recipients for the "New Case Assigned" email sent by auto-routing when a case is first
+// SUBMITTED. Do NOT use this for manual assignment or referrals (department_assignment): the
+// new-case alert doesn't fire for those, so excluding people there would leave them unaware.
+// Reminders, escalations, and the JLC notice also use the unfiltered resolveDepartmentRecipients.
 export async function resolveCaseAssignmentRecipients(
   departmentId: number,
   departmentName: string,

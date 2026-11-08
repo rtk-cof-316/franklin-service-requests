@@ -1,4 +1,4 @@
-import { resolveCaseAssignmentRecipients } from '../_shared/departmentRecipients.ts'
+import { resolveCaseAssignmentRecipients, resolveDepartmentRecipients } from '../_shared/departmentRecipients.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
   if (body.type === 'department_assignment') {
     const { departmentId, caseNumber, location, description, departmentName } = body
 
-    const emails = await resolveCaseAssignmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
+    const emails = await resolveDepartmentRecipients(departmentId, departmentName, serviceRoleKey, supabaseUrl)
 
     if (emails.length === 0) {
       return new Response(JSON.stringify({ success: true, message: 'No recipients for department' }), {
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
       body: JSON.stringify({
         sender: { name: 'Franklin Service Request System', email: 'noreply.franklin.sr@gmail.com' },
-        to: [{ email: 'cmoffice@franklinnh.gov' }],
+        to: [{ email: 'cmoffice@franklinnh.gov' }, { email: 'cityhall@franklinnh.gov' }],
         subject: `📬 New Request Just Came In — Case #${caseNumber}`,
         htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
